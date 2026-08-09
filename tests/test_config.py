@@ -78,6 +78,36 @@ class ConfigTests(unittest.TestCase):
             target.mkdir(mode=0o700)
             self.assertFalse(private_config_ready(target))
 
+    def test_runtime_loader_rejects_permission_drift_after_initial_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_root = Path(directory) / "config"
+            config_root.mkdir(mode=0o700)
+            config_file = config_root / "config.env"
+            config_file.write_text("IPHONE_RECEIVER_TOKEN=private\n")
+            config_file.chmod(0o600)
+            with patch.object(config, "CONFIG_FILE", config_file):
+                self.assertEqual(config.file_values()["IPHONE_RECEIVER_TOKEN"], "private")
+                config_file.chmod(0o644)
+                with self.assertRaisesRegex(IPhoneError, "Refusing to read insecure"):
+                    config.file_values()
+
+    def test_runtime_loader_rejects_symlink_drift_after_initial_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_root = Path(directory) / "config"
+            config_root.mkdir(mode=0o700)
+            config_file = config_root / "config.env"
+            config_file.write_text("IPHONE_RECEIVER_TOKEN=private\n")
+            config_file.chmod(0o600)
+            target = config_root / "other.env"
+            target.write_text("IPHONE_RECEIVER_TOKEN=exposed\n")
+            target.chmod(0o600)
+            with patch.object(config, "CONFIG_FILE", config_file):
+                self.assertEqual(config.file_values()["IPHONE_RECEIVER_TOKEN"], "private")
+                config_file.unlink()
+                config_file.symlink_to(target)
+                with self.assertRaisesRegex(IPhoneError, "Refusing to read insecure"):
+                    config.file_values()
+
     def test_doctor_marks_insecure_config_unavailable(self):
         with tempfile.TemporaryDirectory() as directory:
             config_root = Path(directory) / "config"

@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import shlex
 import stat
-from functools import lru_cache
 from pathlib import Path
 
 from .errors import IPhoneError
@@ -29,12 +28,12 @@ PRIVATE_SOCKET_MODE = 0o600
 PRIVATE_CONFIG_FILE_MODE = 0o600
 
 
-@lru_cache(maxsize=1)
 def file_values() -> dict[str, str]:
+    raw_contents = _read_private_config()
     values: dict[str, str] = {}
-    if not CONFIG_FILE.is_file():
+    if raw_contents is None:
         return values
-    for line_number, raw_line in enumerate(CONFIG_FILE.read_text().splitlines(), 1):
+    for line_number, raw_line in enumerate(raw_contents.splitlines(), 1):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
@@ -55,6 +54,52 @@ def file_values() -> dict[str, str]:
             )
         values[name] = parsed[0] if parsed else ""
     return values
+
+
+def _ensure_private_config_readable() -> None:
+    """Fail closed before every runtime read of the token-bearing config."""
+
+    try:
+        CONFIG_FILE.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise IPhoneError(f"Could not inspect configuration file {CONFIG_FILE}.") from error
+    if not private_config_ready(CONFIG_FILE):
+        raise IPhoneError(
+            f"Refusing to read insecure configuration file {CONFIG_FILE}; expected an "
+            "operator-owned mode-0600 file under a mode-0700 parent."
+        )
+
+
+def _read_private_config() -> str | None:
+    """Read the config through an owner/mode-checked, no-follow file handle."""
+
+    _ensure_private_config_readable()
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(CONFIG_FILE, flags)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise IPhoneError(f"Could not read configuration file {CONFIG_FILE}.") from error
+    try:
+        information = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(information.st_mode)
+            or information.st_uid != os.getuid()
+            or stat.S_IMODE(information.st_mode) != PRIVATE_CONFIG_FILE_MODE
+        ):
+            raise IPhoneError(
+                f"Refusing to read insecure configuration file {CONFIG_FILE}; expected an "
+                "operator-owned mode-0600 file under a mode-0700 parent."
+            )
+        with os.fdopen(descriptor, "r", encoding="utf-8") as stream:
+            descriptor = -1
+            return stream.read()
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def value(name: str, *, required: bool = False) -> str:
@@ -182,9 +227,10 @@ def _validate_private_directory(path: Path, setting: str) -> None:
 def private_config_ready(path: Path | None = None) -> bool:
     """Return whether a config file is a private, operator-owned regular file.
 
-    The doctor command must not report a token-bearing config as ready merely
-    because it is readable.  Reject symlinks, non-regular files, other owners,
-    non-0600 modes, and a parent that is not an exact mode-0700 directory.
+    The doctor and runtime loader must not treat a token-bearing config as
+    private merely because it is readable. Reject symlinks, non-regular files,
+    other owners, non-0600 modes, and a parent that is not an exact mode-0700
+    directory.
     """
 
     target = CONFIG_FILE if path is None else path
