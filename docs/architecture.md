@@ -14,7 +14,8 @@ The Mac sends commands through iMessage. The iPhone returns data through HTTPS.
 
 ## Command format
 
-The sender accepts one line beginning with `hola `. The hardened CLI appends
+The sender accepts one newline-delimited JSON request whose command begins
+with `hola `. The hardened CLI appends
 machine-owned fields to every phone command:
 
 ```text
@@ -69,7 +70,7 @@ paths, but it is not sufficient to authorize a Nami request. The old
 | `hola alarm get <id> ...` | Bounded alarm data to `POST /get-alarm` with one-time capability | Poll the private registration socket for up to 30 seconds |
 | any mutating command | `POST /receipt` with request ID, canonical action, and completed/failed status | Poll the private registration socket for the correlated receipt |
 
-The receiver keeps up to 200 screen, clipboard, and alarm responses in memory. It saves screenshots under `~/.local/share/codex-ios-assistant/inbox/`. Restarting the receiver clears the in-memory values.
+The receiver keeps up to 200 screen, clipboard, and alarm responses in memory. It saves screenshots under `~/.local/share/codex-ios-assistant/inbox/` and purges receiver-owned screenshot artifacts after a ten-minute TTL; copy any screenshot needed for longer-lived logs before then. Restarting the receiver clears the in-memory values.
 
 ## CLI status values
 
@@ -100,5 +101,7 @@ The sender accepts a narrow input:
 
 - The socket has mode `0600`.
 - The sender checks the peer UID when macOS exposes it.
-- Each request contains one `hola` line, with a 4 KiB limit and no newline.
+- Each request contains one UTF-8 JSON line with a 4 KiB encoded-byte limit;
+  JSON escaping permits multiline and multibyte opaque values while the
+  command rejects carriage returns and NUL bytes.
 - The sender calls a fixed `/usr/bin/osascript` program. The client cannot supply an executable or script.

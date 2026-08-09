@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 from .errors import IPhoneError
 from .config import DATA_DIR, CONFIG_FILE, file_values, receiver_url, registration_socket, sender_socket
-from .protocol import REQUEST_ID_PATTERN
+from .protocol import PROTOCOL_VERSION, REQUEST_ID_PATTERN, validate_request_id
 
 
 OperationKind = Literal[
@@ -66,7 +66,9 @@ def command_from_environment(name: str, default: str | list[str]) -> list[str]:
     return list(default) if isinstance(default, list) else shlex.split(default)
 
 
-def command_for(operation: Operation) -> list[str]:
+def command_for(operation: Operation, *, request_id: str | None = None) -> list[str]:
+    if request_id is not None:
+        validate_request_id(request_id)
     if operation.kind == "hola":
         command = [
             *command_from_environment("IPHONE_IMSG_COMMAND", bridge_command("send")),
@@ -84,26 +86,32 @@ def command_for(operation: Operation) -> list[str]:
                 operation.receipt_action or operation.resource + "." + operation.action,
             ]
         )
+        if request_id is not None:
+            command.extend(["--request-id", request_id])
         return command
     if operation.kind == "screen-read":
-        return command_from_environment(
+        command = command_from_environment(
             "IPHONE_READ_SCREEN_COMMAND", bridge_command("read-screen")
         )
+        return [*command, "--request-id", request_id] if request_id is not None else command
     if operation.kind == "screen-capture":
-        return command_from_environment(
+        command = command_from_environment(
             "IPHONE_SCREENSHOT_COMMAND", bridge_command("screenshot")
         )
+        return [*command, "--request-id", request_id] if request_id is not None else command
     if operation.kind == "clipboard-read":
-        return command_from_environment(
+        command = command_from_environment(
             "IPHONE_CLIPBOARD_COMMAND", bridge_command("clipboard")
         )
+        return [*command, "--request-id", request_id] if request_id is not None else command
     if operation.kind == "alarm-read":
-        return command_from_environment("IPHONE_ALARM_COMMAND", bridge_command("alarms"))
+        command = command_from_environment("IPHONE_ALARM_COMMAND", bridge_command("alarms"))
+        return [*command, "--request-id", request_id] if request_id is not None else command
     raise IPhoneError(f"Unsupported operation kind: {operation.kind}")
 
 
-def preview(operation: Operation) -> str:
-    return shlex.join(command_for(operation))
+def preview(operation: Operation, *, request_id: str | None = None) -> str:
+    return shlex.join(command_for(operation, request_id=request_id))
 
 
 def _run(command: list[str], *, timeout: float, environment: dict[str, str]) -> str:
@@ -132,8 +140,11 @@ def execute(
     dry_run: bool = False,
     timeout: float = 30,
     output: str | None = None,
+    request_id: str | None = None,
 ) -> Result:
-    command = command_for(operation)
+    if request_id is not None:
+        validate_request_id(request_id)
+    command = command_for(operation, request_id=request_id)
     common = {
         "kind": operation.kind,
         "command": command,
@@ -147,7 +158,7 @@ def execute(
             resource=operation.resource,
             action=operation.action,
             status="dry-run",
-            summary=preview(operation),
+            summary=preview(operation, request_id=request_id),
             data=common,
             receipt_action=operation.receipt_action or operation.resource + "." + operation.action,
         )
@@ -166,13 +177,15 @@ def execute(
             raise IPhoneError(
                 "The phone action helper did not return a versioned execution receipt."
             ) from error
+        reported_action = receipt.get("receipt_action") if isinstance(receipt, dict) else None
         if (
             not isinstance(receipt, dict)
-            or receipt.get("protocol_version") != 2
+            or receipt.get("protocol_version") != PROTOCOL_VERSION
             or receipt.get("status") not in {"completed", "failed", "timeout"}
             or not isinstance(receipt.get("request_id"), str)
             or REQUEST_ID_PATTERN.fullmatch(receipt["request_id"]) is None
-            or receipt.get("action") != (operation.receipt_action or operation.resource + "." + operation.action)
+            or reported_action != (operation.receipt_action or operation.resource + "." + operation.action)
+            or (request_id is not None and receipt.get("request_id") != request_id)
         ):
             raise IPhoneError("The phone action helper returned an invalid execution receipt.")
         status = str(receipt["status"])
@@ -189,14 +202,14 @@ def execute(
                 **common,
                 "protocol_version": receipt["protocol_version"],
                 "request_id": receipt["request_id"],
-                "receipt_action": receipt["action"],
+                "receipt_action": reported_action,
                 "error_code": error_code,
             },
-            receipt_action=str(receipt["action"]),
+            receipt_action=str(reported_action),
         )
 
     if operation.kind == "screen-read":
-        receipt = _parse_data_receipt(stdout, operation)
+        receipt = _parse_data_receipt(stdout, operation, request_id=request_id)
         if receipt["status"] != "completed":
             return _data_failure_result(operation, common, receipt)
         text = receipt.get("data", {}).get("text") if isinstance(receipt.get("data"), dict) else None
@@ -213,11 +226,11 @@ def execute(
                 "request_id": receipt["request_id"],
                 "text": text,
             },
-            receipt_action=str(receipt["action"]),
+            receipt_action=str(receipt["receipt_action"]),
         )
 
     if operation.kind == "clipboard-read":
-        receipt = _parse_data_receipt(stdout, operation)
+        receipt = _parse_data_receipt(stdout, operation, request_id=request_id)
         if receipt["status"] != "completed":
             return _data_failure_result(operation, common, receipt)
         text = receipt.get("data", {}).get("text") if isinstance(receipt.get("data"), dict) else None
@@ -234,11 +247,11 @@ def execute(
                 "request_id": receipt["request_id"],
                 "text": text,
             },
-            receipt_action=str(receipt["action"]),
+            receipt_action=str(receipt["receipt_action"]),
         )
 
     if operation.kind == "alarm-read":
-        receipt = _parse_data_receipt(stdout, operation)
+        receipt = _parse_data_receipt(stdout, operation, request_id=request_id)
         if receipt["status"] != "completed":
             return _data_failure_result(operation, common, receipt)
         payload = receipt.get("data")
@@ -269,10 +282,10 @@ def execute(
                 "request_id": receipt["request_id"],
                 "alarms": alarms,
             },
-            receipt_action=str(receipt["action"]),
+            receipt_action=str(receipt["receipt_action"]),
         )
 
-    receipt = _parse_data_receipt(stdout, operation)
+    receipt = _parse_data_receipt(stdout, operation, request_id=request_id)
     if receipt["status"] != "completed":
         return _data_failure_result(operation, common, receipt)
     receipt_data = receipt.get("data")
@@ -316,23 +329,30 @@ def execute(
             "request_id": receipt["request_id"],
             "path": str(final_path),
         },
-        receipt_action=str(receipt["action"]),
+        receipt_action=str(receipt["receipt_action"]),
     )
 
 
-def _parse_data_receipt(stdout: str, operation: Operation) -> dict[str, object]:
+def _parse_data_receipt(
+    stdout: str,
+    operation: Operation,
+    *,
+    request_id: str | None = None,
+) -> dict[str, object]:
     try:
         receipt = json.loads(stdout)
     except json.JSONDecodeError as error:
         raise IPhoneError("The phone data helper did not return a versioned receipt.") from error
     expected = operation.receipt_action or operation.resource + "." + operation.action
+    reported_action = receipt.get("receipt_action") if isinstance(receipt, dict) else None
     if (
         not isinstance(receipt, dict)
-        or receipt.get("protocol_version") != 2
+        or receipt.get("protocol_version") != PROTOCOL_VERSION
         or receipt.get("status") not in {"completed", "failed", "timeout"}
         or not isinstance(receipt.get("request_id"), str)
         or REQUEST_ID_PATTERN.fullmatch(receipt["request_id"]) is None
-        or receipt.get("action") != expected
+        or reported_action != expected
+        or (request_id is not None and receipt.get("request_id") != request_id)
         or not isinstance(receipt.get("data"), dict)
     ):
         raise IPhoneError("The phone data helper returned an invalid execution receipt.")
@@ -357,7 +377,7 @@ def _data_failure_result(
             "request_id": receipt["request_id"],
             "error_code": error_code,
         },
-        receipt_action=str(receipt["action"]),
+        receipt_action=str(receipt["receipt_action"]),
     )
 
 

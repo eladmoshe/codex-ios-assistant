@@ -92,8 +92,9 @@ def main() -> int:
             .get("{0, 1}", {})
             .get("OutputUUID")
         )
-        if not isinstance(body_uuid, str) or request_uuid != body_uuid:
-            raise SystemExit("receipt branch is missing dynamic action or matching request id")
+        receipt_action = body_values.get("receipt_action", {})
+        if not isinstance(body_uuid, str) or request_uuid != body_uuid or not receipt_action:
+            raise SystemExit("receipt branch is missing canonical action or matching request id")
         receipt_action_uuids.append(body_uuid)
     action_match_count = sum(
         value == r"(?<=--action=)[a-z0-9._-]+"

@@ -77,7 +77,7 @@ class CLITests(unittest.TestCase):
             helper = Path(directory) / "get-alarms"
             helper.write_text(
                 "#!/bin/sh\n"
-                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action\":\"alarm.list\",\"status\":\"completed\",\"data\":{\"alarms\":[{\"time\":\"7:30 AM\","
+                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"alarm.list\",\"status\":\"completed\",\"data\":{\"alarms\":[{\"time\":\"7:30 AM\","
                 "\"label\":\"Wake up\",\"repeat_days\":\"Weekdays\","
                 "\"allows_snooze\":true,\"enabled\":true}]}}'\n"
             )
@@ -99,7 +99,7 @@ class CLITests(unittest.TestCase):
             "alarm",
             "list",
             env={
-                "IPHONE_ALARM_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action\":\"alarm.list\",\"status\":\"completed\",\"data\":{\"alarms\":[]}}'"
+                "IPHONE_ALARM_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"alarm.list\",\"status\":\"completed\",\"data\":{\"alarms\":[]}}'"
             },
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -120,7 +120,7 @@ class CLITests(unittest.TestCase):
             "clipboard",
             "get",
             env={
-                "IPHONE_CLIPBOARD_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action\":\"clipboard.get\",\"status\":\"completed\",\"data\":{\"text\":\"clipboard-value\"}}'"
+                "IPHONE_CLIPBOARD_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"clipboard.get\",\"status\":\"completed\",\"data\":{\"text\":\"clipboard-value\"}}'"
             },
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -134,7 +134,7 @@ class CLITests(unittest.TestCase):
             "clipboard",
             "get",
             env={
-                "IPHONE_CLIPBOARD_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action\":\"clipboard.get\",\"status\":\"completed\",\"data\":{\"text\":\"\"}}'"
+                "IPHONE_CLIPBOARD_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"clipboard.get\",\"status\":\"completed\",\"data\":{\"text\":\"\"}}'"
             },
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -145,7 +145,7 @@ class CLITests(unittest.TestCase):
             helper = Path(directory) / "screen"
             helper.write_text(
                 "#!/bin/sh\n"
-                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action\":\"screen.read\",\"status\":\"completed\",\"data\":{\"text\":\"Settings\\nWi-Fi\"}}'\n"
+                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"screen.read\",\"status\":\"completed\",\"data\":{\"text\":\"Settings\\nWi-Fi\"}}'\n"
             )
             helper.chmod(0o755)
             result = run_cli(
@@ -172,7 +172,7 @@ class CLITests(unittest.TestCase):
             helper = root / "screenshot"
             helper.write_text(
                 "#!/bin/sh\n"
-                f"printf '%s' '{{\"protocol_version\":2,\"request_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"action\":\"screen.capture\",\"status\":\"completed\",\"data\":{{\"path\":\"{image}\"}}}}'\n"
+                f"printf '%s' '{{\"protocol_version\":2,\"request_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"receipt_action\":\"screen.capture\",\"status\":\"completed\",\"data\":{{\"path\":\"{image}\"}}}}'\n"
             )
             helper.chmod(0o755)
             result = run_cli(
@@ -385,6 +385,46 @@ class CLITests(unittest.TestCase):
         self.assertEqual(value["status"], "dry-run")
         self.assertEqual(value["seconds"], 600)
 
+    def test_json_dry_run_echoes_caller_request_id(self):
+        request_id = "0123456789abcdef0123456789abcdef"
+        result = run_cli(
+            "timer",
+            "start",
+            "10m",
+            "--dry-run",
+            "--json",
+            "--request-id",
+            request_id,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertEqual(value["request_id"], request_id)
+
+    def test_json_handler_failure_is_a_versioned_failed_envelope(self):
+        request_id = "fedcba9876543210fedcba9876543210"
+        result = run_cli(
+            "weather",
+            "open",
+            "--location",
+            "Chicago",
+            "--json",
+            "--request-id",
+            request_id,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertFalse(value["ok"])
+        self.assertEqual(value["protocol_version"], 2)
+        self.assertEqual(value["status"], "failed")
+        self.assertEqual(value["request_id"], request_id)
+        self.assertEqual(value["receipt_action"], "weather.open")
+        self.assertEqual(value["error_code"], "cli_error")
+
+    def test_invalid_request_id_is_rejected(self):
+        result = run_cli("timer", "pause", "--json", "--request-id", "not-an-id")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("request id must be exactly", result.stderr)
+
     def test_default_transport_uses_the_packaged_sender_bridge(self):
         result = run_cli("timer", "start", "10m", "--dry-run", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -499,7 +539,7 @@ class CLITests(unittest.TestCase):
                 "  *'hola lowpower off'*) action='low_power.set' ;;\n"
                 "  *) exit 1 ;;\n"
                 "esac\n"
-                "printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action\":\"%s\",\"status\":\"completed\"}\\n' \"$action\"\n"
+                "printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"%s\",\"status\":\"completed\"}\\n' \"$action\"\n"
             )
             helper.chmod(0o755)
             for arguments, expected in cases:
@@ -516,7 +556,7 @@ class CLITests(unittest.TestCase):
             helper = Path(directory) / "failed-receipt-helper"
             helper.write_text(
                 "#!/bin/sh\n"
-                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"action\":\"timer.pause\",\"status\":\"failed\",\"error_code\":\"shortcut_failed\"}'\n"
+                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"timer.pause\",\"status\":\"failed\",\"error_code\":\"shortcut_failed\"}'\n"
             )
             helper.chmod(0o755)
             result = run_cli(

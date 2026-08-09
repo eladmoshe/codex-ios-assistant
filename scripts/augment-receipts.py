@@ -90,7 +90,9 @@ def receipt_action_parser(branch: str) -> tuple[list[dict[str, object]], str]:
                     },
                     "WFSerializationType": "WFTextTokenAttachment",
                 },
-                "WFItemSpecifier": "First Item",
+                # Opaque command arguments may themselves contain a marker;
+                # the machine-owned trailer is always the final match.
+                "WFItemSpecifier": "Last Item",
             },
         },
     ], action_uuid
@@ -124,7 +126,9 @@ def receipt_parser(branch: str) -> tuple[list[dict[str, object]], tuple[str, str
                     },
                     "WFSerializationType": "WFTextTokenAttachment",
                 },
-                "WFItemSpecifier": "First Item",
+                # Use the final receipt token so an opaque value containing
+                # ``--receipt=`` cannot hijack capability extraction.
+                "WFItemSpecifier": "Last Item",
             },
         },
         {
@@ -155,6 +159,9 @@ def receipt_parser(branch: str) -> tuple[list[dict[str, object]], tuple[str, str
                     },
                     "WFSerializationType": "WFTextTokenAttachment",
                 },
+                # The first split component is the request id; the final is
+                # the capability.  This split is machine-owned, not opaque
+                # command text.
                 "WFItemSpecifier": "First Item",
             },
         },
@@ -202,10 +209,10 @@ def receipt_post(
         [
             field("protocol_version", static_text("2")),
             field("request_id", attachment("Request ID", request_uuid)),
-            # Echo the canonical action from the machine-owned command
+            # Echo the canonical receipt action from the machine-owned command
             # trailer. The same Shortcut openurl branch serves many typed
             # actions (camera.open, messages.compose, url.open, ...).
-            field("action", attachment("Receipt Action", action_uuid)),
+            field("receipt_action", attachment("Receipt Action", action_uuid)),
             field("status", static_text("completed")),
         ]
     )
@@ -353,6 +360,56 @@ def upgrade_existing_receipts(actions: list[dict[str, object]]) -> bool:
     return changed
 
 
+def migrate_existing_receipt_contract(actions: list[dict[str, object]]) -> bool:
+    """Upgrade an already-augmented template without touching native actions.
+
+    Older v2 exports called the canonical field ``action`` and selected the
+    first marker match.  The current contract names the field
+    ``receipt_action`` and selects the final machine-owned trailer, allowing
+    opaque command text to contain marker-like substrings safely.
+    """
+
+    changed = False
+    marker_match_uuids = {
+        item.get("WFWorkflowActionParameters", {}).get("UUID")
+        for item in actions
+        if item.get("WFWorkflowActionIdentifier") == "is.workflow.actions.text.match"
+        and item.get("WFWorkflowActionParameters", {}).get("WFMatchTextPattern")
+        in {
+            r"(?<=--receipt=)[0-9a-f]{32}\.[0-9a-f]{64}",
+            r"(?<=--action=)[a-z0-9._-]+",
+        }
+    }
+    for item in actions:
+        parameters = item.get("WFWorkflowActionParameters", {})
+        if parameters.get("WFURL") == f"{PUBLIC}/receipt":
+            body_items = parameters.get("WFJSONValues", {}).get("Value", {}).get(
+                "WFDictionaryFieldValueItems", []
+            )
+            for body_item in body_items:
+                key = body_item.get("WFKey", {}).get("Value", {}).get("string")
+                if key == "action":
+                    body_item["WFKey"]["Value"]["string"] = "receipt_action"
+                    changed = True
+        if (
+            item.get("WFWorkflowActionIdentifier")
+            == "is.workflow.actions.getitemfromlist"
+            and item.get("WFWorkflowActionParameters", {}).get("WFItemSpecifier")
+            == "First Item"
+        ):
+            # This output UUID is only selected by one of the receipt marker
+            # parsers.  Native Shortcut list operations use different input
+            # names and are intentionally left untouched.
+            input_value = item.get("WFWorkflowActionParameters", {}).get("WFInput", {})
+            value = input_value.get("Value", {}) if isinstance(input_value, dict) else {}
+            output_name = value.get("OutputName") if isinstance(value, dict) else None
+            output_uuid = value.get("OutputUUID") if isinstance(value, dict) else None
+            if output_name == "Matches" and output_uuid in marker_match_uuids:
+                changed = True
+                item["WFWorkflowActionParameters"]["WFItemSpecifier"] = "Last Item"
+    return changed
+
+
 def main() -> int:
     with TEMPLATE.open("rb") as source:
         actions = plistlib.load(source)
@@ -364,6 +421,10 @@ def main() -> int:
     )
     if len(actions) in {211, 243} and receipt_count == 16:
         changed = False
+        if len(actions) == 211 and upgrade_existing_receipts(actions):
+            changed = True
+        if migrate_existing_receipt_contract(actions):
+            changed = True
         for item in actions:
             parameters = item.get("WFWorkflowActionParameters", {})
             if parameters.get("WFURL") != f"{PUBLIC}/receipt":
@@ -392,8 +453,6 @@ def main() -> int:
             ):
                 body_items.insert(1, field("request_id", attachment("Request ID", request_uuid)))
                 changed = True
-        if len(actions) == 211 and upgrade_existing_receipts(actions):
-            changed = True
         if changed:
             with TEMPLATE.open("wb") as output:
                 plistlib.dump(actions, output, fmt=plistlib.FMT_XML, sort_keys=False)

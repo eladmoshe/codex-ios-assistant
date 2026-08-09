@@ -75,7 +75,7 @@ class URLTests(unittest.TestCase):
     def test_messages_compose_is_unsent_validated_form(self):
         self.assertEqual(
             messages_compose_url("+15550101001", "How are you?"),
-            "sms://open?address=%2B15550101001&body=How%20are%20you%3F&sendImmediately=true",
+            "sms://open?address=%2B15550101001&body=How%20are%20you%3F",
         )
 
     def test_messages_group_compose_uses_synced_group_id(self):
@@ -83,7 +83,7 @@ class URLTests(unittest.TestCase):
         self.assertEqual(
             messages_group_compose_url(group_id, "hello there frens"),
             "sms://open?groupid=BF86E595-E17B-4D78-8178-49EE8B53C06C&"
-            "body=hello%20there%20frens&sendImmediately=true",
+            "body=hello%20there%20frens",
         )
 
     def test_messages_group_compose_rejects_non_uuid(self):

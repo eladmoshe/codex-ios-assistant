@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 
 from .config import (
     DATA_DIR,
+    ensure_socket_parent,
     message_target,
     receiver_token,
     receiver_url,
@@ -52,16 +53,46 @@ def _read_line(connection: socket.socket, limit: int) -> bytes:
         if b"\n" in chunk:
             break
     data = b"".join(chunks)
-    if len(data) > limit:
+    line = data.split(b"\n", 1)[0]
+    if len(line) > limit:
         raise IPhoneError("Bridge message exceeded its size limit.")
-    return data.split(b"\n", 1)[0]
+    return line
+
+
+def _sender_payload(command: str) -> bytes:
+    """Encode one sender request and enforce the byte budget before sending.
+
+    ``ensure_ascii=False`` keeps UTF-8 opaque values compact while JSON still
+    escapes embedded newlines and the trailing framing delimiter remains a
+    single byte.  The limit is measured on the encoded JSON line (excluding
+    that delimiter), exactly as the receiver's bounded line reader measures
+    it.
+    """
+
+    if (
+        not isinstance(command, str)
+        or not command.startswith("hola ")
+        or "\r" in command
+        or "\x00" in command
+    ):
+        raise IPhoneError(
+            "The sender accepts a hola command without carriage returns or NUL bytes."
+        )
+    encoded = json.dumps(
+        {"command": command},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if len(encoded) > MAX_COMMAND_BYTES:
+        raise IPhoneError(
+            f"The sender command exceeds its {MAX_COMMAND_BYTES}-byte socket budget."
+        )
+    return encoded + b"\n"
 
 
 def send_command(command: str) -> None:
     """Ask the per-user sender agent to deliver one private command."""
-    if not command.startswith("hola ") or "\n" in command or "\r" in command:
-        raise IPhoneError("The sender accepts one single-line 'hola' command.")
-    payload = json.dumps({"command": command}, separators=(",", ":")).encode() + b"\n"
+    payload = _sender_payload(command)
     path = sender_socket()
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
@@ -117,7 +148,7 @@ def _registration_request(payload: dict[str, object]) -> dict[str, object]:
 def _register(request_id: str, capability: str, action: str, timeout: float) -> None:
     validate_request_id(request_id)
     validate_action(action)
-    _registration_request(
+    response = _registration_request(
         {
             "op": "register",
             "protocol_version": PROTOCOL_VERSION,
@@ -127,6 +158,22 @@ def _register(request_id: str, capability: str, action: str, timeout: float) -> 
             "expires_at": time.time() + min(max(timeout + 10, 30), 180),
         }
     )
+    if response.get("request_id") != request_id:
+        raise IPhoneError("The receiver returned a mismatched registration request id.")
+
+
+def _validate_poll_response(
+    response: dict[str, object],
+    *,
+    request_id: str,
+    expected_action: str,
+) -> None:
+    if response.get("request_id") != request_id:
+        raise IPhoneError("The receiver returned a mismatched receipt request id.")
+    if response.get("state") == "complete":
+        reported_action = response.get("receipt_action")
+        if reported_action != expected_action:
+            raise IPhoneError("The receiver returned a mismatched receipt action.")
 
 
 def _poll_registered(request_id: str, timeout: float, expected_action: str) -> dict[str, object]:
@@ -138,6 +185,11 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
                 "protocol_version": PROTOCOL_VERSION,
                 "request_id": request_id,
             }
+        )
+        _validate_poll_response(
+            response,
+            request_id=request_id,
+            expected_action=expected_action,
         )
         state = response.get("state")
         if state == "complete":
@@ -152,19 +204,22 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
                 "state": "complete",
                 "request_id": request_id,
                 "action": expected_action,
+                "receipt_action": expected_action,
                 "status": "failed",
                 "data": {},
                 "error_code": "receipt_unknown",
             }
         time.sleep(0.5)
     try:
-        _registration_request(
+        cancel_response = _registration_request(
             {
                 "op": "cancel",
                 "protocol_version": PROTOCOL_VERSION,
                 "request_id": request_id,
             }
         )
+        if cancel_response.get("request_id") not in {None, request_id}:
+            raise IPhoneError("The receiver returned a mismatched cancellation request id.")
     except IPhoneError:
         # The timeout remains the truthful result even if cancellation races a
         # receiver restart.
@@ -174,6 +229,7 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
             "state": "complete",
             "request_id": request_id,
             "action": expected_action,
+            "receipt_action": expected_action,
             "status": "timeout",
             "data": {},
             "error_code": "receipt_timeout",
@@ -186,6 +242,11 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
                 "request_id": request_id,
             }
         )
+        _validate_poll_response(
+            response,
+            request_id=request_id,
+            expected_action=expected_action,
+        )
         if response.get("state") == "complete":
             return response
     except IPhoneError:
@@ -196,6 +257,7 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
         "state": "complete",
         "request_id": request_id,
         "action": expected_action,
+        "receipt_action": expected_action,
         "status": "timeout",
         "data": {},
         "error_code": "receipt_timeout",
@@ -241,12 +303,13 @@ def execute_one_way(
     *,
     timeout: float = 30,
     expected_action: str | None = None,
+    request_id: str | None = None,
 ) -> dict[str, object]:
     """Send a finite Shortcut command and wait for its correlated receipt."""
     action = expected_action or _one_way_action(command)
     if expected_action is not None:
         validate_action(expected_action)
-    request_id = new_request_id()
+    request_id = validate_request_id(request_id) if request_id is not None else new_request_id()
     capability = new_receipt_capability()
     _register(request_id, capability, action, timeout)
     wire_command = protocol_command(
@@ -274,6 +337,7 @@ def execute_one_way(
         "protocol_version": PROTOCOL_VERSION,
         "request_id": request_id,
         "action": result.get("action", action),
+        "receipt_action": result.get("receipt_action", action),
         "status": result.get("status", "failed"),
         "data": result.get("data", {}),
         "error_code": result.get("error_code"),
@@ -322,10 +386,12 @@ def _handle_sender_connection(connection: socket.socket) -> None:
         if (
             not isinstance(command, str)
             or not command.startswith("hola ")
-            or "\n" in command
             or "\r" in command
+            or "\x00" in command
         ):
-            raise IPhoneError("The sender accepts one single-line 'hola' command.")
+            raise IPhoneError(
+                "The sender accepts a hola command without carriage returns or NUL bytes."
+            )
         _send_imessage(command)
         response = {"ok": True}
     except (IPhoneError, json.JSONDecodeError, UnicodeDecodeError) as error:
@@ -336,12 +402,12 @@ def _handle_sender_connection(connection: socket.socket) -> None:
 def run_sender() -> None:
     """Run the unsandboxed per-user Messages automation service."""
     path = sender_socket()
+    ensure_socket_parent(path)
     if path.exists():
         mode = path.stat().st_mode
         if not stat.S_ISSOCK(mode):
             raise IPhoneError(f"Refusing to replace non-socket path: {path}")
         path.unlink()
-    path.parent.mkdir(parents=True, exist_ok=True)
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         server.bind(str(path))
@@ -413,8 +479,9 @@ def _execute_data_request(
     action: str,
     command: str,
     timeout: int,
+    request_id: str | None = None,
 ) -> dict[str, object]:
-    request_id = new_request_id()
+    request_id = validate_request_id(request_id) if request_id is not None else new_request_id()
     capability = new_receipt_capability()
     _register(request_id, capability, action, timeout)
     wire_command = protocol_command(
@@ -440,38 +507,42 @@ def _execute_data_request(
     return _poll_registered(request_id, timeout, action)
 
 
-def read_screen() -> None:
+def read_screen(request_id: str | None = None) -> None:
     result = _execute_data_request(
         action="screen.read",
         command="hola screentext",
         timeout=_timeout("READ_SCREEN_TIMEOUT", 30),
+        request_id=request_id,
     )
     _write_data_receipt(result)
 
 
-def read_clipboard() -> None:
+def read_clipboard(request_id: str | None = None) -> None:
     result = _execute_data_request(
         action="clipboard.get",
         command="hola getclipboard",
         timeout=_timeout("CLIPBOARD_TIMEOUT", 30),
+        request_id=request_id,
     )
     _write_data_receipt(result)
 
 
-def read_alarms() -> None:
+def read_alarms(request_id: str | None = None) -> None:
     result = _execute_data_request(
         action="alarm.list",
         command="hola alarm get",
         timeout=_timeout("ALARM_TIMEOUT", 30),
+        request_id=request_id,
     )
     _write_data_receipt(result)
 
 
-def capture_screen() -> None:
+def capture_screen(request_id: str | None = None) -> None:
     result = _execute_data_request(
         action="screen.capture",
         command="hola screenshot",
         timeout=_timeout("SCREENSHOT_TIMEOUT", 45),
+        request_id=request_id,
     )
     _write_data_receipt(result)
 
@@ -490,11 +561,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--receipt-action",
         help="canonical receipt action supplied by the typed CLI policy",
     )
+    send.add_argument(
+        "--request-id",
+        help="caller-owned 32-character lowercase hexadecimal request id",
+    )
     commands.add_parser("sender", help="run the per-user sender agent")
-    commands.add_parser("read-screen", help="request and return on-screen text")
-    commands.add_parser("screenshot", help="request a screenshot and return its path")
-    commands.add_parser("clipboard", help="request and return the iPhone clipboard")
-    commands.add_parser("alarms", help="request and return enabled alarms")
+    for name, help_text in (
+        ("read-screen", "request and return on-screen text"),
+        ("screenshot", "request a screenshot and return its path"),
+        ("clipboard", "request and return the iPhone clipboard"),
+        ("alarms", "request and return enabled alarms"),
+    ):
+        command = commands.add_parser(name, help=help_text)
+        command.add_argument("--request-id")
     return parser
 
 
@@ -507,18 +586,19 @@ def main(argv: list[str] | None = None) -> int:
                 command,
                 timeout=_timeout("IPHONE_ACTION_TIMEOUT", 30),
                 expected_action=args.receipt_action,
+                request_id=args.request_id,
             )
             sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
         elif args.command == "sender":
             run_sender()
         elif args.command == "read-screen":
-            read_screen()
+            read_screen(args.request_id)
         elif args.command == "screenshot":
-            capture_screen()
+            capture_screen(args.request_id)
         elif args.command == "clipboard":
-            read_clipboard()
+            read_clipboard(args.request_id)
         elif args.command == "alarms":
-            read_alarms()
+            read_alarms(args.request_id)
         return 0
     except IPhoneError as error:
         print(f"iphone-assistant-bridge: {error}", file=sys.stderr)

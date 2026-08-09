@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import stat
 from functools import lru_cache
 from pathlib import Path
 
@@ -23,6 +24,8 @@ DATA_DIR = Path(
 LOG_DIR = Path(
     os.environ.get("IOS_ASSISTANT_LOG_DIR", Path.home() / "Library" / "Logs" / APP_NAME)
 ).expanduser()
+PRIVATE_SOCKET_DIR_MODE = 0o700
+PRIVATE_SOCKET_MODE = 0o600
 
 
 @lru_cache(maxsize=1)
@@ -100,13 +103,88 @@ def receiver_url() -> str:
 
 def sender_socket() -> Path:
     configured = value("IPHONE_SENDER_SOCKET")
-    if configured:
-        return Path(configured).expanduser()
-    return Path("/tmp") / f"codex-ios-assistant-{os.getuid()}.sock"
+    path = Path(configured).expanduser() if configured else CONFIG_DIR / "sender.sock"
+    return _validated_socket_path(path, "IPHONE_SENDER_SOCKET")
 
 
 def registration_socket() -> Path:
     configured = value("IPHONE_REGISTRATION_SOCKET")
-    if configured:
-        return Path(configured).expanduser()
-    return Path("/tmp") / f"codex-ios-assistant-receiver-{os.getuid()}.sock"
+    path = Path(configured).expanduser() if configured else CONFIG_DIR / "receiver.sock"
+    return _validated_socket_path(path, "IPHONE_REGISTRATION_SOCKET")
+
+
+def _validated_socket_path(path: Path, setting: str) -> Path:
+    """Return a private socket path and reject predictable/shared locations.
+
+    The old default under ``/tmp`` was guessable by any local process.  A
+    configured path is accepted only when it is absolute, outside ``/tmp``,
+    directly inside the private application config directory, and its
+    existing parent/socket are owned by this user without group/other access.
+    Missing parents/sockets are validated when the service creates them via
+    :func:`ensure_socket_parent`.
+    """
+
+    raw_path = path.expanduser()
+    if raw_path.is_symlink():
+        raise IPhoneError(f"{setting} must not be a symbolic link: {raw_path}")
+    config_raw = CONFIG_DIR.expanduser()
+    if config_raw.is_symlink():
+        raise IPhoneError(
+            f"{setting} config directory must not be a symbolic link: {config_raw}"
+        )
+    path = raw_path.resolve(strict=False)
+    tmp_root = Path("/tmp").resolve()
+    try:
+        path.relative_to(tmp_root)
+    except ValueError:
+        pass
+    else:
+        raise IPhoneError(f"{setting} must point outside /tmp: {path}")
+
+    config_root = config_raw.resolve(strict=False)
+    try:
+        path.relative_to(config_root)
+    except ValueError as error:
+        raise IPhoneError(
+            f"{setting} must live directly under the private config directory: {config_root}"
+        ) from error
+    if path.parent != config_root:
+        raise IPhoneError(f"{setting} must be a direct child of {config_root}")
+    if config_root.exists():
+        _validate_private_directory(config_root, setting)
+
+    parent = path.parent
+    if parent.exists():
+        _validate_private_directory(parent, setting)
+    if path.exists():
+        information = path.lstat()
+        if information.st_uid != os.getuid() or not stat.S_ISSOCK(information.st_mode):
+            raise IPhoneError(f"{setting} must be a socket owned by the current user: {path}")
+        if information.st_mode & 0o077:
+            raise IPhoneError(f"{setting} socket must be mode 0600: {path}")
+    return path
+
+
+def _validate_private_directory(path: Path, setting: str) -> None:
+    information = path.lstat()
+    if (
+        not stat.S_ISDIR(information.st_mode)
+        or stat.S_ISLNK(information.st_mode)
+        or information.st_uid != os.getuid()
+        or information.st_mode & 0o077
+    ):
+        raise IPhoneError(
+            f"{setting} parent must be a mode-0700 directory owned by the current user: {path}"
+        )
+
+
+def ensure_socket_parent(path: Path) -> None:
+    """Create/validate the private parent directory before binding a socket."""
+
+    parent = path.parent
+    if parent.exists():
+        _validate_private_directory(parent, "socket")
+    else:
+        parent.mkdir(parents=True, mode=PRIVATE_SOCKET_DIR_MODE, exist_ok=False)
+        os.chmod(parent, PRIVATE_SOCKET_DIR_MODE)
+        _validate_private_directory(parent, "socket")

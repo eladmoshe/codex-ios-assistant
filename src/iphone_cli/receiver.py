@@ -23,7 +23,7 @@ import threading
 import time
 from typing import Any
 
-from .config import DATA_DIR, receiver_port, receiver_token, registration_socket
+from .config import DATA_DIR, ensure_socket_parent, receiver_port, receiver_token, registration_socket
 from .errors import IPhoneError
 from .protocol import (
     ACTION_PATTERN,
@@ -41,6 +41,9 @@ MAX_DATA_BYTES = 64_000
 MAX_TEXT_CHARS = 20_000
 MAX_ALARMS = 100
 MAX_SCREENSHOT_BYTES = 12_000_000
+MAX_HTTP_WORKERS = 16
+HTTP_REQUEST_TIMEOUT_SECONDS = 15
+SCREENSHOT_RETENTION_SECONDS = 10 * 60
 PENDING_TTL_SECONDS = 180
 COMPLETION_TTL_SECONDS = 600
 ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]{0,63}$")
@@ -204,6 +207,7 @@ def poll_completion(request_id: str) -> dict[str, object]:
                 "state": "complete",
                 "request_id": completion.request_id,
                 "action": completion.action,
+                "receipt_action": completion.action,
                 "status": completion.status,
                 "data": completion.data,
                 "error_code": completion.error_code,
@@ -222,6 +226,7 @@ def poll_completion(request_id: str) -> dict[str, object]:
             "state": "pending",
             "request_id": request_id,
             "action": pending.expected_action,
+            "receipt_action": pending.expected_action,
             "expires_at": pending.expires_at,
         }
 
@@ -352,9 +357,67 @@ def _read_line(connection: socket.socket, limit: int) -> bytes:
         if b"\n" in chunk:
             break
     data = b"".join(chunks)
-    if len(data) > limit:
+    line = data.split(b"\n", 1)[0]
+    if len(line) > limit:
         raise ValueError("registration message exceeded its size limit")
-    return data.split(b"\n", 1)[0]
+    return line
+
+
+# Hardened requests use a 32-lowercase-hex request id. Legacy static-token
+# screenshots use the narrower ``id_from_header`` alphabet and may fall back
+# to ``.bin`` when the payload has no recognized image signature.
+SCREENSHOT_NAME_PATTERN = re.compile(
+    r"^shot-[A-Za-z0-9_-]{1,32}\.(?:png|jpg|bin)(?:\.part)?$"
+)
+
+
+def purge_inbox(inbox: Path, *, now: float | None = None) -> int:
+    """Delete expired receiver-owned screenshot artifacts.
+
+    Nami copies a screenshot into its own controlled artifact location.  The
+    public receiver retains the temporary source only for a short bounded
+    window, and never follows links or removes unrelated files in the inbox.
+    """
+
+    instant = time.time() if now is None else now
+    removed = 0
+    try:
+        entries = list(inbox.iterdir())
+    except OSError:
+        return 0
+    for entry in entries:
+        if SCREENSHOT_NAME_PATTERN.fullmatch(entry.name) is None:
+            continue
+        try:
+            information = entry.lstat()
+            if stat.S_ISLNK(information.st_mode) or not stat.S_ISREG(information.st_mode):
+                continue
+            if information.st_uid != os.getuid():
+                continue
+            if information.st_mtime + SCREENSHOT_RETENTION_SECONDS > instant:
+                continue
+            entry.unlink()
+            removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def _write_private_file(path: Path, data: bytes) -> None:
+    """Create a receiver artifact without following a pre-existing symlink."""
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags | nofollow, 0o600)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            descriptor = -1
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 class RegistrationServer(threading.Thread):
@@ -369,7 +432,7 @@ class RegistrationServer(threading.Thread):
         self.listener: socket.socket | None = None
 
     def run(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_socket_parent(self.path)
         if self.path.exists():
             mode = self.path.stat().st_mode
             if not stat.S_ISSOCK(mode):
@@ -427,7 +490,12 @@ class RegistrationServer(threading.Thread):
                 if not _valid_request_id(request_id):
                     raise IPhoneError("invalid request id")
                 cancel_pending(request_id)
-                response = {"ok": True, "protocol_version": PROTOCOL_VERSION, "state": "canceled"}
+                response = {
+                    "ok": True,
+                    "protocol_version": PROTOCOL_VERSION,
+                    "state": "canceled",
+                    "request_id": request_id,
+                }
             else:
                 raise ValueError("unknown registration operation")
         except (IPhoneError, KeyError, TypeError, ValueError, PermissionError, OSError) as error:
@@ -451,6 +519,10 @@ class RegistrationServer(threading.Thread):
 
 class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "CodexIOSAssistantReceiver/2"
+
+    def setup(self) -> None:
+        super().setup()
+        self.connection.settimeout(HTTP_REQUEST_TIMEOUT_SECONDS)
 
     @property
     def token(self) -> str:
@@ -546,29 +618,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._reply(404, "unknown endpoint\n")
 
     def do_POST(self) -> None:
+        # Authenticate and classify the route before touching Content-Length
+        # bytes.  A public tunnel makes remote callers look loopback-local,
+        # and reading an unauthenticated 12 MiB upload would otherwise let a
+        # caller consume memory/worker time before being rejected.
+        if self.path == "/receipt":
+            if not self._authorized():
+                return
+            credentials: tuple[str, str, str] | None = None
+            limit = MAX_RECEIPT_BYTES
+        elif self.path in HARDENED_ACTION_BY_PATH:
+            if not self._authorized():
+                return
+            credentials = None
+            if self.headers.get("X-Protocol-Version"):
+                hardened = self._hardened_credentials(self.path)
+                if hardened == ():
+                    return
+                if hardened is None:
+                    return self._reply(401, "hardened receipt headers required\n")
+                credentials = hardened
+            limit = (
+                MAX_SCREENSHOT_BYTES
+                if self.path in SCREENSHOT_POST_PATHS
+                else MAX_DATA_BYTES
+            )
+        else:
+            return self._reply(404, "unknown endpoint\n")
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             return self._reply(400, "bad length\n")
-        limit = (
-            MAX_SCREENSHOT_BYTES
-            if self.path in SCREENSHOT_POST_PATHS
-            else MAX_DATA_BYTES if self.path in HARDENED_ACTION_BY_PATH else MAX_RECEIPT_BYTES
-        )
         if not 0 <= length <= limit or (length == 0 and self.path not in {"/clipboard"}):
             return self._reply(400, "bad length\n")
         data = self.rfile.read(length)
         if self.path == "/receipt":
             return self.handle_receipt(data)
-        if self.path in HARDENED_ACTION_BY_PATH and self.headers.get("X-Protocol-Version"):
-            credentials = self._hardened_credentials(self.path)
-            if credentials == ():
-                return
-            if credentials is None:
-                return self._reply(401, "hardened receipt headers required\n")
+        if credentials is not None:
             return self.handle_hardened_data(data, *credentials)
-        if not self._authorized():
-            return
         if self.path in SCREEN_TEXT_POST_PATHS:
             return self.handle_text(data)
         if self.path == "/clipboard":
@@ -594,10 +681,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._reply(400, "receipt body is not valid JSON\n")
         if not isinstance(payload, dict):
             return self._reply(400, "receipt body must be an object\n")
-        action = payload.get("action")
+        action = payload.get("receipt_action")
         status = payload.get("status")
         if not _valid_action(action) or status not in {"completed", "failed"}:
-            return self._reply(400, "invalid receipt action or status\n")
+            return self._reply(400, "invalid receipt_action or status\n")
+        legacy_action = payload.get("action")
+        if legacy_action is not None and legacy_action != action:
+            return self._reply(400, "receipt action aliases do not match\n")
         # Shortcuts serializes dictionary values as strings even when the
         # semantic value is numeric. Accept both representations at this
         # boundary while keeping the emitted receipt version numeric.
@@ -633,6 +723,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         content_type = self.headers.get("Content-Type", "")
         path = self.path
         if path in SCREENSHOT_POST_PATHS:
+            purge_inbox(self.inbox)
             if content_type.startswith("multipart/form-data"):
                 data = largest_multipart_payload(data, content_type) or data
             if not data or len(data) > MAX_SCREENSHOT_BYTES:
@@ -640,15 +731,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
             extension = ".png" if data[:4] == b"\x89PNG" else ".jpg" if data[:2] == b"\xff\xd8" else None
             if extension is None:
                 return self._reply(400, "screenshot must be PNG or JPEG\n")
-            temporary = self.inbox / f"shot-{request_id}{extension}.part"
             path_value = self.inbox / f"shot-{request_id}{extension}"
-            temporary.write_bytes(data)
-            temporary.chmod(0o600)
-            os.replace(temporary, path_value)
+            try:
+                # Publish directly with O_EXCL. A retry for the same request
+                # can never replace an accepted artifact or unlink another
+                # request's file when capability consumption races it.
+                _write_private_file(path_value, data)
+            except FileExistsError:
+                return self._reply(409, "screenshot request already has an artifact\n")
+            created_identity = path_value.lstat()
             try:
                 accept_receipt(request_id, capability, action, "completed", data={"path": str(path_value.resolve())})
             except (PermissionError, LookupError):
-                path_value.unlink(missing_ok=True)
+                try:
+                    current_identity = path_value.lstat()
+                    if (
+                        current_identity.st_dev == created_identity.st_dev
+                        and current_identity.st_ino == created_identity.st_ino
+                    ):
+                        path_value.unlink()
+                except OSError:
+                    pass
                 return self._reply(403, "receipt authorization failed\n")
             return self._reply(200, json.dumps({"ok": True, "protocol_version": PROTOCOL_VERSION}))
 
@@ -779,6 +882,45 @@ class Handler(http.server.BaseHTTPRequestHandler):
         print(f"{self.address_string()} {format_string % arguments}", flush=True)
 
 
+class BoundedThreadingHTTPServer(http.server.ThreadingHTTPServer):
+    """Threaded server with a hard cap and periodic screenshot cleanup."""
+
+    daemon_threads = True
+    request_queue_size = MAX_HTTP_WORKERS * 2
+
+    def __init__(self, *arguments: object, max_workers: int = MAX_HTTP_WORKERS, **kwargs: object):
+        super().__init__(*arguments, **kwargs)
+        self._worker_slots = threading.BoundedSemaphore(max_workers)
+        self._last_inbox_purge = 0.0
+
+    def process_request(self, request: socket.socket, client_address: object) -> None:
+        if not self._worker_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+
+        def worker() -> None:
+            try:
+                self.finish_request(request, client_address)
+            except BaseException:
+                self.handle_error(request, client_address)
+            finally:
+                self.shutdown_request(request)
+                self._worker_slots.release()
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+
+    def service_actions(self) -> None:
+        super().service_actions()
+        now = time.time()
+        if now - self._last_inbox_purge < 30:
+            return
+        self._last_inbox_purge = now
+        inbox = getattr(self, "inbox", None)
+        if isinstance(inbox, Path):
+            purge_inbox(inbox, now=now)
+
+
 def _parse_alarm_records(payload: object) -> list[dict[str, object]]:
     value = payload.get("alarms") if isinstance(payload, dict) else None
     records: list[dict[str, object]] = []
@@ -826,7 +968,7 @@ def main() -> int:
     registration = RegistrationServer(registration_socket())
     registration.start()
     try:
-        server = http.server.ThreadingHTTPServer(("127.0.0.1", receiver_port()), Handler)
+        server = BoundedThreadingHTTPServer(("127.0.0.1", receiver_port()), Handler)
     except BaseException:
         registration.close()
         registration.join(timeout=2)

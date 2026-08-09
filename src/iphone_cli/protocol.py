@@ -1,8 +1,12 @@
 """Versioned, correlated command and receipt protocol helpers.
 
-The iMessage payload is intentionally still a single line because the phone
-automation receives plain text.  The fields after the human-readable command
-are machine-owned and are never taken from the model's arguments.
+The sender socket is newline-delimited JSON, so a command may safely carry
+escaped newlines and UTF-8 text without turning the framing delimiter into
+part of the command.  The command sent through Messages is still validated
+as one protocol value: carriage returns and NUL bytes are rejected, while
+ordinary newlines remain representable for opaque text such as clipboard and
+draft-message bodies.  The fields after the human-readable command are
+machine-owned and are never taken from the model's arguments.
 """
 
 from __future__ import annotations
@@ -65,10 +69,22 @@ def protocol_command(
     request_id: str,
     capability: str,
 ) -> str:
-    """Append protocol metadata to a validated one-line hola command."""
+    """Append protocol metadata to a validated hola command.
 
-    if not command.startswith("hola ") or "\n" in command or "\r" in command:
-        raise IPhoneError("The sender accepts one single-line 'hola' command.")
+    Newline-delimited JSON on the private sender socket preserves embedded
+    newlines in the command.  Carriage returns and NUL bytes are rejected
+    because they have ambiguous behavior in Messages/Shortcuts and cannot be
+    represented safely by the native action inputs.
+    """
+
+    if (
+        not command.startswith("hola ")
+        or "\r" in command
+        or "\x00" in command
+    ):
+        raise IPhoneError(
+            "The sender accepts a hola command without carriage returns or NUL bytes."
+        )
     validate_action(action)
     validate_request_id(request_id)
     validate_receipt_capability(capability)
@@ -85,4 +101,3 @@ def parse_receipt_token(command: str) -> tuple[str, str]:
     if not match:
         raise IPhoneError("command does not contain a valid receipt token")
     return validate_request_id(match.group(1)), validate_receipt_capability(match.group(2))
-

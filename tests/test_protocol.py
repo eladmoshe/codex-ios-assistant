@@ -1,8 +1,16 @@
+import json
 import unittest
 from unittest.mock import patch
 
 from iphone_cli.errors import IPhoneError
-from iphone_cli.bridge import _one_way_action, _poll_registered, build_parser
+from iphone_cli.bridge import (
+    MAX_COMMAND_BYTES,
+    _one_way_action,
+    _poll_registered,
+    _sender_payload,
+    build_parser,
+    execute_one_way,
+)
 from iphone_cli.protocol import (
     PROTOCOL_VERSION,
     new_receipt_capability,
@@ -64,18 +72,65 @@ class ProtocolTests(unittest.TestCase):
                 capability=new_receipt_capability(),
             )
 
+    def test_sender_payload_escapes_newlines_and_preserves_unicode(self):
+        command = "hola copytoclipboard café ☕\nsecond line"
+        payload = _sender_payload(command)
+        self.assertTrue(payload.endswith(b"\n"))
+        self.assertLessEqual(len(payload) - 1, MAX_COMMAND_BYTES)
+        self.assertEqual(json.loads(payload), {"command": command})
+
+    def test_sender_payload_accepts_exact_encoded_budget(self):
+        # The budget is on the UTF-8 JSON line, not on Python characters.
+        prefix = '{"command":"hola copytoclipboard '
+        suffix = '"}'
+        value = "x" * (MAX_COMMAND_BYTES - len(prefix.encode()) - len(suffix.encode()))
+        payload = _sender_payload("hola copytoclipboard " + value)
+        self.assertEqual(len(payload) - 1, MAX_COMMAND_BYTES)
+
+    def test_sender_payload_rejects_one_byte_over_budget(self):
+        prefix = '{"command":"hola copytoclipboard '
+        suffix = '"}'
+        value = "x" * (MAX_COMMAND_BYTES - len(prefix.encode()) - len(suffix.encode()) + 1)
+        with self.assertRaisesRegex(IPhoneError, "4096-byte"):
+            _sender_payload("hola copytoclipboard " + value)
+
+    def test_sender_payload_multibyte_boundary_is_measured_in_utf8_bytes(self):
+        command_prefix = "hola copytoclipboard "
+        candidate = "é" * 4_000
+        while True:
+            try:
+                payload = _sender_payload(command_prefix + candidate)
+            except IPhoneError:
+                candidate = candidate[:-1]
+                continue
+            break
+        self.assertLessEqual(len(payload) - 1, MAX_COMMAND_BYTES)
+        with self.assertRaisesRegex(IPhoneError, "4096-byte"):
+            _sender_payload(command_prefix + candidate + "é")
+
+    def test_sender_payload_rejects_carriage_return_and_nul(self):
+        for value in ("hola copytoclipboard line\rbreak", "hola copytoclipboard line\x00break"):
+            with self.subTest(value=repr(value)), self.assertRaises(IPhoneError):
+                _sender_payload(value)
+
     def test_poll_timeout_is_a_typed_non_success_result(self):
         request_id = "a" * 32
         with patch(
             "iphone_cli.bridge._registration_request",
             side_effect=[
-                {"ok": True, "protocol_version": PROTOCOL_VERSION, "state": "canceled"},
+                {
+                    "ok": True,
+                    "protocol_version": PROTOCOL_VERSION,
+                    "state": "canceled",
+                    "request_id": request_id,
+                },
                 {
                     "ok": True,
                     "protocol_version": PROTOCOL_VERSION,
                     "state": "complete",
                     "request_id": request_id,
                     "action": "timer.start",
+                    "receipt_action": "timer.start",
                     "status": "timeout",
                     "data": {},
                     "error_code": "receipt_timeout",
@@ -85,6 +140,46 @@ class ProtocolTests(unittest.TestCase):
             result = _poll_registered(request_id, 0, "timer.start")
         self.assertEqual(result["status"], "timeout")
         self.assertEqual(result["action"], "timer.start")
+
+    def test_poll_rejects_mismatched_request_id(self):
+        with patch(
+            "iphone_cli.bridge._registration_request",
+            return_value={
+                "ok": True,
+                "protocol_version": PROTOCOL_VERSION,
+                "state": "complete",
+                "request_id": "b" * 32,
+                "receipt_action": "timer.start",
+                "status": "completed",
+                "data": {},
+            },
+        ):
+            with self.assertRaisesRegex(IPhoneError, "mismatched receipt request"):
+                _poll_registered("a" * 32, 1, "timer.start")
+
+    def test_execute_one_way_echoes_caller_request_id_through_registration_and_receipt(self):
+        request_id = "c" * 32
+        with patch("iphone_cli.bridge._register") as register, patch(
+            "iphone_cli.bridge.send_command"
+        ) as send, patch(
+            "iphone_cli.bridge._poll_registered",
+            return_value={
+                "request_id": request_id,
+                "action": "timer.start",
+                "receipt_action": "timer.start",
+                "status": "completed",
+                "data": {},
+            },
+        ):
+            result = execute_one_way(
+                "hola timer start 60",
+                expected_action="timer.start",
+                request_id=request_id,
+            )
+        self.assertEqual(register.call_args.args[0], request_id)
+        self.assertIn(f"--request-id={request_id}", send.call_args.args[0])
+        self.assertEqual(result["request_id"], request_id)
+        self.assertEqual(result["receipt_action"], "timer.start")
 
     def test_bridge_accepts_policy_owned_receipt_action_for_openurl_branches(self):
         args = build_parser().parse_args(

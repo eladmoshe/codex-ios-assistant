@@ -63,6 +63,14 @@ def _positive_int(value: str) -> int:
     return result
 
 
+def _request_id(value: str) -> str:
+    if REQUEST_ID_PATTERN.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError(
+            "request id must be exactly 32 lowercase hexadecimal characters"
+        )
+    return value
+
+
 def _alarm_time(value: str) -> str:
     compact = re.sub(r"\s+", "", value).replace(".", "").upper()
     for pattern in ("%H:%M", "%I:%M%p", "%I%p"):
@@ -113,6 +121,13 @@ def _global_parent() -> argparse.ArgumentParser:
         default=argparse.SUPPRESS,
         metavar="SECONDS",
         help="maximum wait for the iPhone or a helper (default: 30)",
+    )
+    parent.add_argument(
+        "--request-id",
+        type=_request_id,
+        default=argparse.SUPPRESS,
+        metavar="32-HEX-ID",
+        help="correlation id supplied by the caller (32 lowercase hex characters)",
     )
     parent.add_argument(
         "--version",
@@ -1042,8 +1057,29 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _result_dictionary(result: Result) -> dict[str, object]:
-    request_id = result.data.get("request_id")
+def _failure_action(args: argparse.Namespace) -> tuple[str, str, str]:
+    """Derive the policy-owned action identity when a handler fails early."""
+
+    resource = str(getattr(args, "resource", "iphone"))
+    leaf_action = getattr(args, "action", None)
+    if resource == "call":
+        return resource, "start", "call.start"
+    if resource == "low-power":
+        return resource, str(getattr(args, "state", "set")), "low_power.set"
+    if resource == "control-center":
+        return resource, str(getattr(args, "state", "set")), "control_center.set"
+    if resource == "alarm" and leaf_action == "off":
+        return resource, "disable_at", "alarm.disable_at"
+    if resource == "home":
+        return resource, "open", "home.open"
+    if resource == "doctor":
+        return resource, "check", "doctor.check"
+    action = str(leaf_action or "unknown")
+    return resource, action, f"{resource}.{action}"
+
+
+def _result_dictionary(result: Result, *, requested_request_id: str | None = None) -> dict[str, object]:
+    request_id = requested_request_id or result.data.get("request_id")
     if not isinstance(request_id, str) or REQUEST_ID_PATTERN.fullmatch(request_id) is None:
         # Mac-local reads (Contacts/Messages) do not use the phone receiver,
         # but Nami still gets a valid correlation for its own audit record.
@@ -1067,7 +1103,16 @@ def _result_dictionary(result: Result) -> dict[str, object]:
 
 def _emit(result: Result, args: argparse.Namespace) -> None:
     if getattr(args, "json_output", False):
-        print(json.dumps(_result_dictionary(result), indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                _result_dictionary(
+                    result,
+                    requested_request_id=getattr(args, "request_id", None),
+                ),
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return
 
     if result.resource == "doctor":
@@ -1105,6 +1150,7 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=getattr(args, "dry_run", False),
                 timeout=getattr(args, "timeout", 30),
                 output=getattr(args, "output", None),
+                request_id=getattr(args, "request_id", None),
             )
         _emit(result, args)
         # Structured callers (including Nami) must be able to inspect a
@@ -1116,7 +1162,28 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if result.status in {"failed", "timeout"} else 0
     except IPhoneError as error:
         if getattr(args, "json_output", False):
-            print(json.dumps({"ok": False, "error": str(error)}, indent=2), file=sys.stdout)
+            resource, action, receipt_action = _failure_action(args)
+            request_id = getattr(args, "request_id", None) or new_request_id()
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "protocol_version": PROTOCOL_VERSION,
+                        "status": "failed",
+                        "resource": resource,
+                        "action": action,
+                        "receipt_action": receipt_action,
+                        "request_id": request_id,
+                        "error_code": "cli_error",
+                        "error": str(error),
+                        "summary": f"The {receipt_action} operation failed.",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                file=sys.stdout,
+            )
+            return 0
         else:
             print(f"iphone: {error}", file=sys.stderr)
         return 1
