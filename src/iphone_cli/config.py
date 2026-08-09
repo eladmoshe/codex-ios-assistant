@@ -103,3 +103,10 @@ def sender_socket() -> Path:
     if configured:
         return Path(configured).expanduser()
     return Path("/tmp") / f"codex-ios-assistant-{os.getuid()}.sock"
+
+
+def registration_socket() -> Path:
+    configured = value("IPHONE_REGISTRATION_SOCKET")
+    if configured:
+        return Path(configured).expanduser()
+    return Path("/tmp") / f"codex-ios-assistant-receiver-{os.getuid()}.sock"

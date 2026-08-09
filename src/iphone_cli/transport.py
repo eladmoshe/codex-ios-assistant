@@ -6,6 +6,7 @@ import json
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 from urllib.error import URLError
@@ -15,7 +16,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .errors import IPhoneError
-from .config import CONFIG_FILE, file_values, receiver_url, sender_socket
+from .config import DATA_DIR, CONFIG_FILE, file_values, receiver_url, registration_socket, sender_socket
+from .protocol import REQUEST_ID_PATTERN
 
 
 OperationKind = Literal[
@@ -37,6 +39,10 @@ class Operation:
     summary: str = ""
     url: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Canonical contract consumed by the Nami executor. Most actions use
+    # ``resource.action``; state setters and UI launchers intentionally share
+    # one typed action while their state remains in argv/metadata.
+    receipt_action: str | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +52,7 @@ class Result:
     status: str
     summary: str
     data: dict[str, Any]
+    receipt_action: str | None = None
 
 
 def bridge_command(action: str) -> list[str]:
@@ -61,11 +68,23 @@ def command_from_environment(name: str, default: str | list[str]) -> list[str]:
 
 def command_for(operation: Operation) -> list[str]:
     if operation.kind == "hola":
-        return [
+        command = [
             *command_from_environment("IPHONE_IMSG_COMMAND", bridge_command("send")),
             "hola",
             *operation.arguments,
         ]
+        # The wire command alone cannot distinguish typed actions that all
+        # use the Shortcut's openurl branch (camera.open, messages.compose,
+        # url.open, and so on). Pass the policy-owned canonical receipt name
+        # as a separate bridge option; it is never part of the phone command
+        # consumed by the Shortcut.
+        command.extend(
+            [
+                "--receipt-action",
+                operation.receipt_action or operation.resource + "." + operation.action,
+            ]
+        )
+        return command
     if operation.kind == "screen-read":
         return command_from_environment(
             "IPHONE_READ_SCREEN_COMMAND", bridge_command("read-screen")
@@ -130,6 +149,7 @@ def execute(
             status="dry-run",
             summary=preview(operation),
             data=common,
+            receipt_action=operation.receipt_action or operation.resource + "." + operation.action,
         )
 
     environment = os.environ.copy()
@@ -140,43 +160,91 @@ def execute(
     stdout = _run(command, timeout=timeout + 5, environment=environment)
 
     if operation.kind == "hola":
-        # The legacy bridge acknowledges that Messages accepted the command,
-        # but it does not yet return a phone-side execution receipt.
+        try:
+            receipt = json.loads(stdout)
+        except json.JSONDecodeError as error:
+            raise IPhoneError(
+                "The phone action helper did not return a versioned execution receipt."
+            ) from error
+        if (
+            not isinstance(receipt, dict)
+            or receipt.get("protocol_version") != 2
+            or receipt.get("status") not in {"completed", "failed", "timeout"}
+            or not isinstance(receipt.get("request_id"), str)
+            or REQUEST_ID_PATTERN.fullmatch(receipt["request_id"]) is None
+            or receipt.get("action") != (operation.receipt_action or operation.resource + "." + operation.action)
+        ):
+            raise IPhoneError("The phone action helper returned an invalid execution receipt.")
+        status = str(receipt["status"])
+        error_code = receipt.get("error_code")
+        summary = operation.summary
+        if status != "completed":
+            summary = f"The phone did not complete {operation.action} ({error_code or status})."
         return Result(
             resource=operation.resource,
             action=operation.action,
-            status="requested",
-            summary=operation.summary,
-            data=common,
+            status=status,
+            summary=summary,
+            data={
+                **common,
+                "protocol_version": receipt["protocol_version"],
+                "request_id": receipt["request_id"],
+                "receipt_action": receipt["action"],
+                "error_code": error_code,
+            },
+            receipt_action=str(receipt["action"]),
         )
 
     if operation.kind == "screen-read":
-        stdout = stdout.strip()
+        receipt = _parse_data_receipt(stdout, operation)
+        if receipt["status"] != "completed":
+            return _data_failure_result(operation, common, receipt)
+        text = receipt.get("data", {}).get("text") if isinstance(receipt.get("data"), dict) else None
+        if not isinstance(text, str):
+            raise IPhoneError("The screen receipt did not contain text data.")
         return Result(
             resource=operation.resource,
             action=operation.action,
-            status="completed",
-            summary=stdout,
-            data={**common, "text": stdout},
+            status=str(receipt["status"]),
+            summary=text,
+            data={
+                **common,
+                "protocol_version": receipt["protocol_version"],
+                "request_id": receipt["request_id"],
+                "text": text,
+            },
+            receipt_action=str(receipt["action"]),
         )
 
     if operation.kind == "clipboard-read":
+        receipt = _parse_data_receipt(stdout, operation)
+        if receipt["status"] != "completed":
+            return _data_failure_result(operation, common, receipt)
+        text = receipt.get("data", {}).get("text") if isinstance(receipt.get("data"), dict) else None
+        if not isinstance(text, str):
+            raise IPhoneError("The clipboard receipt did not contain text data.")
         return Result(
             resource=operation.resource,
             action=operation.action,
-            status="completed",
-            summary=stdout,
-            data={**common, "text": stdout},
+            status=str(receipt["status"]),
+            summary=text,
+            data={
+                **common,
+                "protocol_version": receipt["protocol_version"],
+                "request_id": receipt["request_id"],
+                "text": text,
+            },
+            receipt_action=str(receipt["action"]),
         )
 
     if operation.kind == "alarm-read":
-        try:
-            payload = json.loads(stdout)
-        except json.JSONDecodeError as error:
-            raise IPhoneError("Alarm helper returned invalid JSON.") from error
+        receipt = _parse_data_receipt(stdout, operation)
+        if receipt["status"] != "completed":
+            return _data_failure_result(operation, common, receipt)
+        payload = receipt.get("data")
         alarms = payload.get("alarms") if isinstance(payload, dict) else None
         if not isinstance(alarms, list) or not all(isinstance(alarm, dict) for alarm in alarms):
-            raise IPhoneError("Alarm helper response must contain an alarms array.")
+            raise IPhoneError("The alarm receipt did not contain an alarms array.")
         if alarms:
             lines = []
             for alarm in alarms:
@@ -193,15 +261,43 @@ def execute(
         return Result(
             resource=operation.resource,
             action=operation.action,
-            status="completed",
+            status=str(receipt["status"]),
             summary=summary,
-            data={**common, "alarms": alarms},
+            data={
+                **common,
+                "protocol_version": receipt["protocol_version"],
+                "request_id": receipt["request_id"],
+                "alarms": alarms,
+            },
+            receipt_action=str(receipt["action"]),
         )
 
-    source = Path(stdout.strip()).expanduser()
-    if not source.is_file():
-        raise IPhoneError(f"Screenshot helper returned a missing file: {source}")
-    final_path = source.resolve()
+    receipt = _parse_data_receipt(stdout, operation)
+    if receipt["status"] != "completed":
+        return _data_failure_result(operation, common, receipt)
+    receipt_data = receipt.get("data")
+    path_text = receipt_data.get("path") if isinstance(receipt_data, dict) else None
+    if not isinstance(path_text, str):
+        raise IPhoneError("The screenshot receipt did not contain a path.")
+    source = Path(path_text).expanduser()
+    inbox = (DATA_DIR / "inbox").resolve()
+    source_path = source.absolute()
+    try:
+        information = source_path.lstat()
+        final_path = source_path.resolve(strict=True)
+    except FileNotFoundError as error:
+        raise IPhoneError(f"Screenshot helper returned a missing file: {source}") from error
+    if (
+        stat.S_ISLNK(information.st_mode)
+        or not stat.S_ISREG(information.st_mode)
+        or not final_path.is_relative_to(inbox)
+        or information.st_size > 12_000_000
+    ):
+        raise IPhoneError("Screenshot helper returned an invalid or oversized image.")
+    with final_path.open("rb") as image_file:
+        signature = image_file.read(4)
+    if signature != b"\x89PNG" and signature[:2] != b"\xff\xd8":
+        raise IPhoneError("Screenshot helper returned a non-PNG/JPEG image.")
     if output:
         destination = Path(output).expanduser()
         if destination.is_dir():
@@ -212,9 +308,56 @@ def execute(
     return Result(
         resource=operation.resource,
         action=operation.action,
-        status="completed",
+        status=str(receipt["status"]),
         summary=str(final_path),
-        data={**common, "path": str(final_path)},
+        data={
+            **common,
+            "protocol_version": receipt["protocol_version"],
+            "request_id": receipt["request_id"],
+            "path": str(final_path),
+        },
+        receipt_action=str(receipt["action"]),
+    )
+
+
+def _parse_data_receipt(stdout: str, operation: Operation) -> dict[str, object]:
+    try:
+        receipt = json.loads(stdout)
+    except json.JSONDecodeError as error:
+        raise IPhoneError("The phone data helper did not return a versioned receipt.") from error
+    expected = operation.receipt_action or operation.resource + "." + operation.action
+    if (
+        not isinstance(receipt, dict)
+        or receipt.get("protocol_version") != 2
+        or receipt.get("status") not in {"completed", "failed", "timeout"}
+        or not isinstance(receipt.get("request_id"), str)
+        or REQUEST_ID_PATTERN.fullmatch(receipt["request_id"]) is None
+        or receipt.get("action") != expected
+        or not isinstance(receipt.get("data"), dict)
+    ):
+        raise IPhoneError("The phone data helper returned an invalid execution receipt.")
+    return receipt
+
+
+def _data_failure_result(
+    operation: Operation,
+    common: dict[str, object],
+    receipt: dict[str, object],
+) -> Result:
+    status = str(receipt["status"])
+    error_code = receipt.get("error_code") or status
+    return Result(
+        resource=operation.resource,
+        action=operation.action,
+        status=status,
+        summary=f"The phone did not complete {operation.action} ({error_code}).",
+        data={
+            **common,
+            "protocol_version": receipt["protocol_version"],
+            "request_id": receipt["request_id"],
+            "error_code": error_code,
+        },
+        receipt_action=str(receipt["action"]),
     )
 
 
@@ -247,6 +390,17 @@ def dependency_report() -> list[dict[str, object]]:
             "available": socket_path.exists() and socket_path.is_socket(),
             "command": str(socket_path),
             "path": str(socket_path) if socket_path.exists() else None,
+        }
+    )
+
+    receipt_socket = registration_socket()
+    report.append(
+        {
+            "name": "Receipt registration",
+            "required": True,
+            "available": receipt_socket.exists() and receipt_socket.is_socket(),
+            "command": str(receipt_socket),
+            "path": str(receipt_socket) if receipt_socket.exists() else None,
         }
     )
 

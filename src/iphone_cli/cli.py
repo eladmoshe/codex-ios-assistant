@@ -13,6 +13,7 @@ from . import __version__
 from .contact_search import run_contact_search
 from .errors import IPhoneError
 from .message_history import run_message_read
+from .protocol import PROTOCOL_VERSION, REQUEST_ID_PATTERN, new_request_id
 from .resolve import (
     resolve_contact_phone,
     resolve_message_compose_target,
@@ -422,10 +423,11 @@ def _handle_screen_capture(args: argparse.Namespace) -> Operation:
 def _handle_home(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="home",
-        action="show",
+        action="open",
         kind="hola",
         arguments=("homescreen",),
         summary="Home Screen shown.",
+        receipt_action="home.open",
     )
 
 
@@ -437,6 +439,7 @@ def _handle_flashlight(args: argparse.Namespace) -> Operation:
         kind="hola",
         arguments=("flashlight", args.state),
         summary=f"Flashlight {action}.",
+        receipt_action="flashlight.set",
     )
 
 
@@ -487,7 +490,7 @@ def _handle_alarm_set(args: argparse.Namespace) -> Operation:
 def _handle_alarm_off(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="alarm",
-        action="off",
+        action="disable_at",
         kind="hola",
         arguments=("alarm", "off", args.time),
         summary=f"Alarm-off requested for {_display_alarm_time(args.time)}.",
@@ -499,7 +502,7 @@ def _handle_call(args: argparse.Namespace) -> Operation:
     phone = resolve_contact_phone(args.recipient)
     return Operation(
         resource="call",
-        action="call",
+        action="start",
         kind="hola",
         arguments=("call", phone),
         summary=f"Call placed to {args.recipient}.",
@@ -531,6 +534,7 @@ def _handle_low_power(args: argparse.Namespace) -> Operation:
         kind="hola",
         arguments=("lowpower", args.state),
         summary=f"Low Power Mode {action}.",
+        receipt_action="low_power.set",
     )
 
 
@@ -542,6 +546,7 @@ def _handle_control_center(args: argparse.Namespace) -> Operation:
         kind="hola",
         arguments=("controlcenter", args.state),
         summary=f"Control Center {action}.",
+        receipt_action="control_center.set",
     )
 
 
@@ -1038,14 +1043,26 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _result_dictionary(result: Result) -> dict[str, object]:
-    return {
-        "ok": result.status not in {"failed"},
+    request_id = result.data.get("request_id")
+    if not isinstance(request_id, str) or REQUEST_ID_PATTERN.fullmatch(request_id) is None:
+        # Mac-local reads (Contacts/Messages) do not use the phone receiver,
+        # but Nami still gets a valid correlation for its own audit record.
+        request_id = new_request_id()
+    payload = {
+        **result.data,
+        "ok": result.status in {"completed", "dry-run"},
+        # This is a public, versioned contract even for Mac-local reads that
+        # do not traverse the phone receiver. Keep it after result.data so a
+        # helper cannot spoof or downgrade the protocol version.
+        "protocol_version": PROTOCOL_VERSION,
         "status": result.status,
         "resource": result.resource,
         "action": result.action,
+        "receipt_action": result.receipt_action or result.resource + "." + result.action,
+        "request_id": request_id,
         "summary": result.summary,
-        **result.data,
     }
+    return payload
 
 
 def _emit(result: Result, args: argparse.Namespace) -> None:
@@ -1090,7 +1107,13 @@ def main(argv: list[str] | None = None) -> int:
                 output=getattr(args, "output", None),
             )
         _emit(result, args)
-        return 1 if result.status == "failed" else 0
+        # Structured callers (including Nami) must be able to inspect a
+        # truthful failed/timeout receipt rather than losing it to a generic
+        # subprocess-exit error. Human-readable invocations retain a useful
+        # non-zero status for terminal failures.
+        if getattr(args, "json_output", False):
+            return 0
+        return 1 if result.status in {"failed", "timeout"} else 0
     except IPhoneError as error:
         if getattr(args, "json_output", False):
             print(json.dumps({"ok": False, "error": str(error)}, indent=2), file=sys.stdout)

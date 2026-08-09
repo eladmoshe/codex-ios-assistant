@@ -1,13 +1,26 @@
 import http.server
 import json
 from pathlib import Path
+import socket
+import stat
 import tempfile
 import threading
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from iphone_cli.receiver import ALARMS, CLIPBOARDS, TEXTS, Handler
+from iphone_cli.receiver import (
+    ALARMS,
+    CLIPBOARDS,
+    COMPLETIONS,
+    PENDING,
+    TEXTS,
+    Handler,
+    RegistrationServer,
+    accept_receipt,
+    poll_completion,
+    register_pending,
+)
 
 
 class ReceiverTests(unittest.TestCase):
@@ -17,6 +30,8 @@ class ReceiverTests(unittest.TestCase):
         TEXTS.clear()
         CLIPBOARDS.clear()
         ALARMS.clear()
+        PENDING.clear()
+        COMPLETIONS.clear()
         self.temporary = tempfile.TemporaryDirectory()
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.receiver_token = self.token
@@ -135,6 +150,144 @@ class ReceiverTests(unittest.TestCase):
         self.assertEqual(alarms[1]["label"], "")
         self.assertFalse(alarms[1]["allows_snooze"])
         self.assertTrue(all(alarm["enabled"] for alarm in alarms))
+
+    def test_hardened_receipt_is_correlated_and_single_use(self):
+        request_id = "a" * 32
+        capability = "b" * 64
+        register_pending(request_id, capability, "timer.start")
+        self.assertEqual(poll_completion(request_id)["state"], "pending")
+        accept_receipt(request_id, capability, "timer.start", "completed")
+        result = poll_completion(request_id)
+        self.assertEqual(result["status"], "completed")
+        with self.assertRaises(LookupError):
+            accept_receipt(request_id, capability, "timer.start", "completed")
+
+    def test_http_receipt_requires_matching_body_and_header_identity(self):
+        request_id = "1" * 32
+        capability = "2" * 64
+        register_pending(request_id, capability, "home.open")
+        payload = json.dumps(
+            {
+                "protocol_version": "2",
+                "request_id": request_id,
+                "action": "home.open",
+                "status": "completed",
+            }
+        ).encode()
+        status, _ = self.request(
+            "POST",
+            "/receipt",
+            body=payload,
+            headers={
+                "Content-Type": "application/json",
+                "X-Protocol-Version": "2",
+                "X-Request-Id": request_id,
+                "X-Receipt-Capability": capability,
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(poll_completion(request_id)["status"], "completed")
+
+        next_request_id = "3" * 32
+        next_capability = "4" * 64
+        register_pending(next_request_id, next_capability, "home.open")
+        mismatched = payload.replace(request_id.encode(), ("5" * 32).encode(), 1)
+        status, _ = self.request(
+            "POST",
+            "/receipt",
+            body=mismatched,
+            headers={
+                "Content-Type": "application/json",
+                "X-Protocol-Version": "2",
+                "X-Request-Id": next_request_id,
+                "X-Receipt-Capability": next_capability,
+            },
+        )
+        self.assertEqual(status, 400)
+
+    def test_hardened_data_response_does_not_accept_static_token_alone(self):
+        request_id = "c" * 32
+        capability = "d" * 64
+        register_pending(request_id, capability, "screen.read")
+        payload = json.dumps({"screen": "private text"}).encode()
+        status, _ = self.request(
+            "POST",
+            "/text",
+            body=payload,
+            authenticated=False,
+            headers={
+                "Content-Type": "application/json",
+                "X-Protocol-Version": "2",
+                "X-Request-Id": request_id,
+                "X-Receipt-Capability": capability,
+            },
+        )
+        self.assertEqual(status, 403)
+        status, _ = self.request(
+            "POST",
+            "/text",
+            body=payload,
+            headers={
+                "Content-Type": "application/json",
+                "X-Protocol-Version": "2",
+                "X-Request-Id": request_id,
+            },
+        )
+        self.assertEqual(status, 400)
+        status, _ = self.request(
+            "POST",
+            "/text",
+            body=payload,
+            headers={
+                "Content-Type": "application/json",
+                "X-Protocol-Version": "2",
+                "X-Request-Id": request_id,
+                "X-Receipt-Capability": capability,
+            },
+        )
+        self.assertEqual(status, 200)
+        result = poll_completion(request_id)
+        self.assertEqual(result["status"], "completed")
+        self.assertIn("private text", result["data"]["text"])
+
+    def test_registration_socket_supports_register_poll_and_cancel(self):
+        path = Path(self.temporary.name) / "registration.sock"
+        registration = RegistrationServer(path)
+        registration.start()
+        try:
+            for _ in range(20):
+                if path.exists():
+                    break
+                threading.Event().wait(0.01)
+            self.assertTrue(path.is_socket())
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+
+            def call(payload):
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                    connection.settimeout(1)
+                    connection.connect(str(path))
+                    connection.sendall(json.dumps(payload).encode() + b"\n")
+                    return json.loads(connection.recv(16_384))
+
+            request_id = "e" * 32
+            capability = "f" * 64
+            self.assertTrue(
+                call(
+                    {
+                        "op": "register",
+                        "protocol_version": 2,
+                        "request_id": request_id,
+                        "capability": capability,
+                        "action": "timer.start",
+                    }
+                )["ok"]
+            )
+            self.assertEqual(call({"op": "poll", "request_id": request_id})["state"], "pending")
+            self.assertTrue(call({"op": "cancel", "request_id": request_id})["ok"])
+            self.assertEqual(call({"op": "poll", "request_id": request_id})["status"], "timeout")
+        finally:
+            registration.close()
+            registration.join(timeout=2)
 
 
 if __name__ == "__main__":

@@ -14,11 +14,25 @@ The installer keeps these files outside Git or under ignored paths. Config files
 
 ## Receiver
 
-The receiver binds to `127.0.0.1`. Cloudflare is its public route. Phone-data endpoints require an exact `X-Auth` token with at least 32 characters. `/` and `/health` expose a fixed status string.
+The receiver binds to `127.0.0.1`. Cloudflare is its public route. `/` and
+`/health` expose a fixed status string. Hardened phone-data and receipt
+requests require protocol version 2, a 32-lowercase-hex-character request ID,
+and a random per-request capability in `X-Receipt-Capability`. The receiver compares the
+capability hash in constant time and consumes a matching pending request
+before returning success.
 
-Receiver logs include byte counts, alarm counts, and request IDs. They do not include screen text, clipboard values, or alarm details. Text responses live in memory. Screenshots remain on disk until you remove them.
+The receiver also exposes a separate mode-`0600` Unix registration socket for
+the local CLI. It accepts only the current user's peer UID and supports
+register, poll, and cancel operations. The public HTTP listener never accepts
+registrations. Pending requests expire, are bounded, and are not replayable.
 
-The token is a bearer secret stored in the Shortcut. Someone who obtains the token and hostname could submit false responses or read a response after guessing its request ID. The current protocol has no request signature, expiration, or replay check.
+Receiver logs include byte counts, alarm counts, and request IDs. They do not include screen text, clipboard values, capabilities, or alarm details. Hardened read responses are bounded before being returned to the CLI. Text responses live in memory. Screenshots remain on disk until you remove them.
+
+The static token remains in the rendered Shortcut for defense in depth and
+legacy interactive paths, but it is not sufficient for a Nami request. An
+attacker also needs the live, single-use capability registered for that exact
+request, plus its request ID and expected action. A lost receiver process
+therefore yields a timeout/inconclusive result rather than an inferred success.
 
 ## Messages sender
 

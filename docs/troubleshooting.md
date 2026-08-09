@@ -65,7 +65,9 @@ Check the path in order:
 2. Watch the iPhone automation. If it does not start, check its Message conditions.
 3. Run the matching Shortcut branch by hand to expose an iOS error or permission prompt.
 4. Check the receiver log for a POST with the request ID from the message.
-5. Confirm that the Shortcut passed the same ID in `X-Screenshot-Id`.
+5. Confirm that the Shortcut passed the same ID in `X-Request-Id` and the
+   one-time capability in `X-Receipt-Capability`. The old `X-Screenshot-Id`
+   header is only for legacy static-token requests.
 
 Increase the timeout for a slow phone without changing the default:
 
@@ -106,7 +108,7 @@ If `contacts` is missing, install Xcode Command Line Tools, accept the Xcode lic
 - Click the canvas before pressing Command-V.
 - Press Command-V once.
 - Rerun `scripts/copy-shortcut` if the pasteboard contains something else.
-- Check for `Copied and verified 95 Shortcuts actions` in the terminal.
+- Check for `Copied and verified 243 Shortcuts actions` in the terminal.
 - Run `make test` to validate the committed plist.
 
 Keep the previous Shortcut until the replacement passes a test.
