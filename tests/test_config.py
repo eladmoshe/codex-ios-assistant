@@ -102,6 +102,21 @@ class ConfigTests(unittest.TestCase):
                 report = transport.dependency_report()
             self.assertFalse(report[0]["available"])
 
+    def test_doctor_does_not_read_an_insecure_config_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_root = Path(directory) / "config"
+            config_root.mkdir(mode=0o700)
+            config_file = config_root / "config.env"
+            config_file.write_text("IPHONE_RECEIVER_TOKEN=private\n")
+            config_file.chmod(0o644)
+            with patch.object(transport, "CONFIG_FILE", config_file), patch.object(
+                transport, "file_values", side_effect=AssertionError("insecure file was read")
+            ), patch.object(transport, "sender_socket", return_value=config_root / "sender.sock"), patch.object(
+                transport, "registration_socket", return_value=config_root / "receiver.sock"
+            ), patch.object(transport, "receiver_url", return_value="http://127.0.0.1:1"):
+                report = transport.dependency_report()
+            self.assertFalse(report[0]["available"])
+
 
 if __name__ == "__main__":
     unittest.main()

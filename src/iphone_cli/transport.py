@@ -391,13 +391,17 @@ def _data_failure_result(
 
 def dependency_report() -> list[dict[str, object]]:
     report: list[dict[str, object]] = []
-    configured = file_values()
+    configuration_file_ready = private_config_ready(CONFIG_FILE)
+    # Do not read a token-bearing file until its ownership, type, mode, and
+    # parent directory have passed the private-file check. This also keeps
+    # doctor usable when an unreadable root-owned file was left behind.
+    configured = file_values() if configuration_file_ready else {}
     required_names = (
         "IPHONE_MSG_TARGET",
         "IPHONE_PUBLIC_URL",
         "IPHONE_RECEIVER_TOKEN",
     )
-    configuration_ready = private_config_ready(CONFIG_FILE) and all(
+    configuration_ready = configuration_file_ready and all(
         os.environ.get(name, configured.get(name, "")).strip() for name in required_names
     )
     report.append(
