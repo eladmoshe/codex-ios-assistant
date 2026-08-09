@@ -11,6 +11,9 @@ This project connects Codex, Messages, an iPhone Shortcut, and a public hostname
 - `~/.local/share/codex-ios-assistant/inbox/` contains screenshots.
 
 The installer keeps these files outside Git or under ignored paths. Config files and screenshots use mode `0600`; their parent directories use `0700`.
+`iphone doctor` reports the private config as ready only when the config file is
+an operator-owned regular file with mode `0600` under an operator-owned mode
+`0700` directory; symlinks and shared permissions are rejected.
 
 ## Receiver
 

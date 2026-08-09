@@ -16,7 +16,15 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .errors import IPhoneError
-from .config import DATA_DIR, CONFIG_FILE, file_values, receiver_url, registration_socket, sender_socket
+from .config import (
+    DATA_DIR,
+    CONFIG_FILE,
+    file_values,
+    private_config_ready,
+    receiver_url,
+    registration_socket,
+    sender_socket,
+)
 from .protocol import PROTOCOL_VERSION, REQUEST_ID_PATTERN, validate_request_id
 
 
@@ -389,7 +397,7 @@ def dependency_report() -> list[dict[str, object]]:
         "IPHONE_PUBLIC_URL",
         "IPHONE_RECEIVER_TOKEN",
     )
-    configuration_ready = CONFIG_FILE.is_file() and all(
+    configuration_ready = private_config_ready(CONFIG_FILE) and all(
         os.environ.get(name, configured.get(name, "")).strip() for name in required_names
     )
     report.append(

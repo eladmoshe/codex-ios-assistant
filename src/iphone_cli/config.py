@@ -26,6 +26,7 @@ LOG_DIR = Path(
 ).expanduser()
 PRIVATE_SOCKET_DIR_MODE = 0o700
 PRIVATE_SOCKET_MODE = 0o600
+PRIVATE_CONFIG_FILE_MODE = 0o600
 
 
 @lru_cache(maxsize=1)
@@ -171,11 +172,37 @@ def _validate_private_directory(path: Path, setting: str) -> None:
         not stat.S_ISDIR(information.st_mode)
         or stat.S_ISLNK(information.st_mode)
         or information.st_uid != os.getuid()
-        or information.st_mode & 0o077
+        or stat.S_IMODE(information.st_mode) != PRIVATE_SOCKET_DIR_MODE
     ):
         raise IPhoneError(
             f"{setting} parent must be a mode-0700 directory owned by the current user: {path}"
         )
+
+
+def private_config_ready(path: Path | None = None) -> bool:
+    """Return whether a config file is a private, operator-owned regular file.
+
+    The doctor command must not report a token-bearing config as ready merely
+    because it is readable.  Reject symlinks, non-regular files, other owners,
+    non-0600 modes, and a parent that is not an exact mode-0700 directory.
+    """
+
+    target = CONFIG_FILE if path is None else path
+    try:
+        information = target.expanduser().lstat()
+        if (
+            stat.S_ISLNK(information.st_mode)
+            or not stat.S_ISREG(information.st_mode)
+            or information.st_uid != os.getuid()
+            or stat.S_IMODE(information.st_mode) != PRIVATE_CONFIG_FILE_MODE
+        ):
+            return False
+        _validate_private_directory(target.expanduser().parent, "config file")
+    except OSError:
+        return False
+    except IPhoneError:
+        return False
+    return True
 
 
 def ensure_socket_parent(path: Path) -> None:
