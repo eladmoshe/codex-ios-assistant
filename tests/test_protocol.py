@@ -142,7 +142,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(result["status"], "timeout")
         self.assertEqual(result["action"], "timer.start")
 
-    def test_poll_rejects_mismatched_request_id(self):
+    def test_post_dispatch_mismatched_poll_is_timeout_not_failure(self):
         with patch(
             "iphone_cli.bridge._registration_request",
             return_value={
@@ -154,9 +154,23 @@ class ProtocolTests(unittest.TestCase):
                 "status": "completed",
                 "data": {},
             },
+        ), patch("iphone_cli.bridge.time.monotonic", side_effect=[0, 0.1, 1.1]), patch(
+            "iphone_cli.bridge.time.sleep"
         ):
-            with self.assertRaisesRegex(IPhoneError, "mismatched receipt request"):
-                _poll_registered("a" * 32, 1, "timer.start")
+            result = _poll_registered("a" * 32, 1, "timer.start")
+        self.assertEqual(result["status"], "timeout")
+        self.assertEqual(result["error_code"], "receipt_poll_unavailable")
+
+    def test_post_dispatch_receiver_outage_is_timeout_not_failure(self):
+        with patch(
+            "iphone_cli.bridge._registration_request",
+            side_effect=IPhoneError("receiver restarted"),
+        ), patch("iphone_cli.bridge.time.monotonic", side_effect=[0, 0.1, 1.1]), patch(
+            "iphone_cli.bridge.time.sleep"
+        ):
+            result = _poll_registered("a" * 32, 1, "timer.start")
+        self.assertEqual(result["status"], "timeout")
+        self.assertEqual(result["error_code"], "receipt_poll_unavailable")
 
     def test_unknown_receipt_state_after_possible_dispatch_is_timeout_not_failure(self):
         request_id = "d" * 32

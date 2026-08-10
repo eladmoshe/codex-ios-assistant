@@ -178,19 +178,29 @@ def _validate_poll_response(
 
 def _poll_registered(request_id: str, timeout: float, expected_action: str) -> dict[str, object]:
     deadline = time.monotonic() + timeout
+    poll_error_seen = False
     while time.monotonic() < deadline:
-        response = _registration_request(
-            {
-                "op": "poll",
-                "protocol_version": PROTOCOL_VERSION,
-                "request_id": request_id,
-            }
-        )
-        _validate_poll_response(
-            response,
-            request_id=request_id,
-            expected_action=expected_action,
-        )
+        try:
+            response = _registration_request(
+                {
+                    "op": "poll",
+                    "protocol_version": PROTOCOL_VERSION,
+                    "request_id": request_id,
+                }
+            )
+            _validate_poll_response(
+                response,
+                request_id=request_id,
+                expected_action=expected_action,
+            )
+        except IPhoneError:
+            # Registration succeeded before possible Messages dispatch. Any
+            # later receiver outage or malformed poll response is ambiguous,
+            # never a definitive action failure. Keep polling for recovery and
+            # eventually return a typed timeout instead of inviting a retry.
+            poll_error_seen = True
+            time.sleep(0.5)
+            continue
         state = response.get("state")
         if state == "complete":
             return response
@@ -232,7 +242,7 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
             "receipt_action": expected_action,
             "status": "timeout",
             "data": {},
-            "error_code": "receipt_timeout",
+            "error_code": "receipt_poll_unavailable" if poll_error_seen else "receipt_timeout",
         }
     try:
         response = _registration_request(
@@ -260,7 +270,7 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
         "receipt_action": expected_action,
         "status": "timeout",
         "data": {},
-        "error_code": "receipt_timeout",
+        "error_code": "receipt_poll_unavailable" if poll_error_seen else "receipt_timeout",
     }
 
 

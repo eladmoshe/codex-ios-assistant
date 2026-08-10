@@ -70,7 +70,14 @@ paths, but it is not sufficient to authorize a Nami request. The old
 | `hola alarm get <id> ...` | Bounded alarm data to `POST /get-alarm` with one-time capability | Poll the private registration socket for up to 30 seconds |
 | any mutating command | `POST /receipt` with request ID, canonical action, and completed/failed status | Poll the private registration socket for the correlated receipt |
 
-The receiver keeps up to 200 screen, clipboard, and alarm responses in memory. It saves screenshots under `~/.local/share/codex-ios-assistant/inbox/` and purges receiver-owned screenshot artifacts after a ten-minute TTL; copy any screenshot needed for longer-lived logs before then. Restarting the receiver clears the in-memory values.
+Legacy static-token screen, clipboard, and alarm responses remain in bounded
+memory and are cleared by a receiver restart. Hardened protocol-v2 completions,
+including bounded private text/data, are persisted for at most ten minutes in
+the operator-owned mode-`0600` receiver state file so a restart cannot lose a
+correlated result. The receiver saves screenshots under
+`~/.local/share/codex-ios-assistant/inbox/` and purges receiver-owned screenshot
+artifacts after the same ten-minute TTL; copy any screenshot needed for a
+longer-lived log before then.
 
 ## CLI status values
 

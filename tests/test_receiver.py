@@ -50,20 +50,27 @@ class ReceiverStateTests(unittest.TestCase):
     def test_pending_capability_and_completion_survive_process_memory_loss(self):
         request_id = "7" * 32
         capability = "8" * 64
-        register_pending(request_id, capability, "timer.start")
+        register_pending(request_id, capability, "screen.read")
         self.assertEqual(stat.S_IMODE(self.state_path.stat().st_mode), 0o600)
         self.assertNotIn(capability, self.state_path.read_text())
 
         PENDING.clear()
         COMPLETIONS.clear()
         self.assertEqual(poll_completion(request_id)["state"], "pending")
-        accept_receipt(request_id, capability, "timer.start", "completed")
+        accept_receipt(
+            request_id,
+            capability,
+            "screen.read",
+            "completed",
+            data={"text": "private text survives restart"},
+        )
 
         PENDING.clear()
         COMPLETIONS.clear()
         result = poll_completion(request_id)
         self.assertEqual(result["status"], "completed")
-        self.assertEqual(result["receipt_action"], "timer.start")
+        self.assertEqual(result["receipt_action"], "screen.read")
+        self.assertEqual(result["data"], {"text": "private text survives restart"})
 
 
 class ReceiverTests(unittest.TestCase):

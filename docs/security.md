@@ -33,7 +33,15 @@ Their capability hashes and bounded completions are atomically persisted in an
 operator-owned mode-`0600` state file under the private data directory; raw
 capabilities are never written to disk.
 
-Receiver logs include byte counts, alarm counts, and request IDs. They do not include screen text, clipboard values, capabilities, or alarm details. Hardened read responses are bounded before being returned to the CLI. Text responses live in memory. Receiver-owned screenshots are retained only for a bounded ten-minute TTL after which the inbox sweeper removes them; copy any screenshot needed for a longer-lived Nami log before that deadline.
+Receiver logs include byte counts, alarm counts, and request IDs. They do not
+include screen text, clipboard values, capabilities, or alarm details. Hardened
+read responses are bounded before being returned to the CLI. Their correlated
+completion data, including private text, is retained for at most ten minutes in
+the operator-owned mode-`0600` state file so it survives a receiver restart;
+legacy static-token values remain memory-only. Receiver-owned screenshots are
+retained only for the same bounded ten-minute TTL, after which the inbox sweeper
+removes them; copy any screenshot needed for a longer-lived Nami log before
+that deadline.
 
 The static token remains in the rendered Shortcut for defense in depth and
 legacy interactive paths, but it is not sufficient for a Nami request. An
