@@ -90,8 +90,11 @@ expected_action, expires_at)` over a separate mode-0600 Unix socket owned by
 the receiver. The socket supports register, poll, and cancel operations and
 checks the peer UID. A public receipt must match all of the following before it
 is consumed: protocol version, request ID, capability hash, canonical action,
-and an unexpired pending record. Receiver restart loses pending capabilities;
-it never infers success from a `requested` sender response.
+and an unexpired pending record. Pending capability hashes and bounded
+completions are atomically persisted in an operator-owned mode-0600 state file,
+so a receiver restart preserves the correlation contract. Missing state after
+possible dispatch is still timeout/inconclusive, never inferred success or a
+definitive failure that invites an unsafe retry.
 
 ## Messages sender
 

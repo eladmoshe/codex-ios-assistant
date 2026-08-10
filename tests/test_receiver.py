@@ -29,16 +29,57 @@ from iphone_cli.receiver import (
 )
 
 
+class ReceiverStateTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.previous_state_path = os.environ.get("IOS_ASSISTANT_RECEIVER_STATE_PATH")
+        self.state_path = Path(self.temporary.name) / "receiver-state.json"
+        os.environ["IOS_ASSISTANT_RECEIVER_STATE_PATH"] = str(self.state_path)
+        PENDING.clear()
+        COMPLETIONS.clear()
+
+    def tearDown(self):
+        PENDING.clear()
+        COMPLETIONS.clear()
+        if self.previous_state_path is None:
+            os.environ.pop("IOS_ASSISTANT_RECEIVER_STATE_PATH", None)
+        else:
+            os.environ["IOS_ASSISTANT_RECEIVER_STATE_PATH"] = self.previous_state_path
+        self.temporary.cleanup()
+
+    def test_pending_capability_and_completion_survive_process_memory_loss(self):
+        request_id = "7" * 32
+        capability = "8" * 64
+        register_pending(request_id, capability, "timer.start")
+        self.assertEqual(stat.S_IMODE(self.state_path.stat().st_mode), 0o600)
+        self.assertNotIn(capability, self.state_path.read_text())
+
+        PENDING.clear()
+        COMPLETIONS.clear()
+        self.assertEqual(poll_completion(request_id)["state"], "pending")
+        accept_receipt(request_id, capability, "timer.start", "completed")
+
+        PENDING.clear()
+        COMPLETIONS.clear()
+        result = poll_completion(request_id)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["receipt_action"], "timer.start")
+
+
 class ReceiverTests(unittest.TestCase):
     token = "test-token-that-is-longer-than-thirty-two-characters"
 
     def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.previous_state_path = os.environ.get("IOS_ASSISTANT_RECEIVER_STATE_PATH")
+        os.environ["IOS_ASSISTANT_RECEIVER_STATE_PATH"] = str(
+            Path(self.temporary.name) / "receiver-state.json"
+        )
         TEXTS.clear()
         CLIPBOARDS.clear()
         ALARMS.clear()
         PENDING.clear()
         COMPLETIONS.clear()
-        self.temporary = tempfile.TemporaryDirectory()
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.receiver_token = self.token
         self.server.inbox = Path(self.temporary.name)
@@ -51,6 +92,10 @@ class ReceiverTests(unittest.TestCase):
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=2)
+        if self.previous_state_path is None:
+            os.environ.pop("IOS_ASSISTANT_RECEIVER_STATE_PATH", None)
+        else:
+            os.environ["IOS_ASSISTANT_RECEIVER_STATE_PATH"] = self.previous_state_path
         self.temporary.cleanup()
 
     def request(

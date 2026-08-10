@@ -29,6 +29,9 @@ The receiver also exposes a separate mode-`0600` Unix registration socket for
 the local CLI. It accepts only the current user's peer UID and supports
 register, poll, and cancel operations. The public HTTP listener never accepts
 registrations. Pending requests expire, are bounded, and are not replayable.
+Their capability hashes and bounded completions are atomically persisted in an
+operator-owned mode-`0600` state file under the private data directory; raw
+capabilities are never written to disk.
 
 Receiver logs include byte counts, alarm counts, and request IDs. They do not include screen text, clipboard values, capabilities, or alarm details. Hardened read responses are bounded before being returned to the CLI. Text responses live in memory. Receiver-owned screenshots are retained only for a bounded ten-minute TTL after which the inbox sweeper removes them; copy any screenshot needed for a longer-lived Nami log before that deadline.
 

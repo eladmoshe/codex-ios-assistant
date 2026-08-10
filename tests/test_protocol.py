@@ -5,6 +5,7 @@ from unittest.mock import patch
 from iphone_cli.errors import IPhoneError
 from iphone_cli.bridge import (
     MAX_COMMAND_BYTES,
+    _execute_data_request,
     _one_way_action,
     _poll_registered,
     _sender_payload,
@@ -157,6 +158,21 @@ class ProtocolTests(unittest.TestCase):
             with self.assertRaisesRegex(IPhoneError, "mismatched receipt request"):
                 _poll_registered("a" * 32, 1, "timer.start")
 
+    def test_unknown_receipt_state_after_possible_dispatch_is_timeout_not_failure(self):
+        request_id = "d" * 32
+        with patch(
+            "iphone_cli.bridge._registration_request",
+            return_value={
+                "ok": True,
+                "protocol_version": PROTOCOL_VERSION,
+                "state": "unknown",
+                "request_id": request_id,
+            },
+        ):
+            result = _poll_registered(request_id, 1, "timer.start")
+        self.assertEqual(result["status"], "timeout")
+        self.assertEqual(result["error_code"], "receipt_state_unknown")
+
     def test_execute_one_way_echoes_caller_request_id_through_registration_and_receipt(self):
         request_id = "c" * 32
         with patch("iphone_cli.bridge._register") as register, patch(
@@ -180,6 +196,51 @@ class ProtocolTests(unittest.TestCase):
         self.assertIn(f"--request-id={request_id}", send.call_args.args[0])
         self.assertEqual(result["request_id"], request_id)
         self.assertEqual(result["receipt_action"], "timer.start")
+
+    def test_sender_response_loss_still_polls_for_phone_receipt(self):
+        request_id = "e" * 32
+        with patch("iphone_cli.bridge._register"), patch(
+            "iphone_cli.bridge.send_command", side_effect=IPhoneError("sender response lost")
+        ), patch(
+            "iphone_cli.bridge._poll_registered",
+            return_value={
+                "request_id": request_id,
+                "action": "timer.start",
+                "receipt_action": "timer.start",
+                "status": "completed",
+                "data": {},
+            },
+        ) as poll:
+            result = execute_one_way(
+                "hola timer start 60",
+                expected_action="timer.start",
+                request_id=request_id,
+            )
+        poll.assert_called_once_with(request_id, 30, "timer.start")
+        self.assertEqual(result["status"], "completed")
+
+    def test_data_request_sender_response_loss_still_polls_for_phone_receipt(self):
+        request_id = "f" * 32
+        with patch("iphone_cli.bridge._register"), patch(
+            "iphone_cli.bridge.send_command", side_effect=IPhoneError("sender response lost")
+        ), patch(
+            "iphone_cli.bridge._poll_registered",
+            return_value={
+                "request_id": request_id,
+                "action": "screen.read",
+                "receipt_action": "screen.read",
+                "status": "completed",
+                "data": {"text": "hello"},
+            },
+        ) as poll:
+            result = _execute_data_request(
+                action="screen.read",
+                command="hola screentext",
+                timeout=30,
+                request_id=request_id,
+            )
+        poll.assert_called_once_with(request_id, 30, "screen.read")
+        self.assertEqual(result["status"], "completed")
 
     def test_bridge_accepts_policy_owned_receipt_action_for_openurl_branches(self):
         args = build_parser().parse_args(

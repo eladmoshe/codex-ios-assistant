@@ -195,9 +195,9 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
         if state == "complete":
             return response
         if state == "unknown":
-            # A receiver restart discards in-memory capabilities. Surface a
-            # typed failure to the caller; never infer completion from the
-            # sender's earlier delivery acknowledgment.
+            # Missing durable state after possible dispatch is ambiguous. It
+            # must never invite an automatic retry through a false definitive
+            # failure, and Messages acknowledgment is still not completion.
             return {
                 "ok": True,
                 "protocol_version": PROTOCOL_VERSION,
@@ -205,9 +205,9 @@ def _poll_registered(request_id: str, timeout: float, expected_action: str) -> d
                 "request_id": request_id,
                 "action": expected_action,
                 "receipt_action": expected_action,
-                "status": "failed",
+                "status": "timeout",
                 "data": {},
-                "error_code": "receipt_unknown",
+                "error_code": "receipt_state_unknown",
             }
         time.sleep(0.5)
     try:
@@ -321,17 +321,11 @@ def execute_one_way(
     try:
         send_command(wire_command)
     except IPhoneError:
-        try:
-            _registration_request(
-                {
-                    "op": "cancel",
-                    "protocol_version": PROTOCOL_VERSION,
-                    "request_id": request_id,
-                }
-            )
-        except IPhoneError:
-            pass
-        raise
+        # The sender may have handed the command to Messages and then lost its
+        # local socket response. Keep the durable registration alive and poll
+        # for the phone receipt; if none arrives, return timeout/unknown rather
+        # than a definitive failure that could prompt a duplicate retry.
+        pass
     result = _poll_registered(request_id, timeout, action)
     return {
         "protocol_version": PROTOCOL_VERSION,
@@ -493,17 +487,10 @@ def _execute_data_request(
     try:
         send_command(wire_command)
     except IPhoneError:
-        try:
-            _registration_request(
-                {
-                    "op": "cancel",
-                    "protocol_version": PROTOCOL_VERSION,
-                    "request_id": request_id,
-                }
-            )
-        except IPhoneError:
-            pass
-        raise
+        # A lost sender response is ambiguous after possible Messages
+        # dispatch. Preserve the registration and let the correlated receipt
+        # or timeout determine the truthful result.
+        pass
     return _poll_registered(request_id, timeout, action)
 
 

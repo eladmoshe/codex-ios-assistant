@@ -34,7 +34,8 @@ from .protocol import (
 
 
 MAX_PENDING = 512
-MAX_COMPLETIONS = 512
+MAX_COMPLETIONS = 200
+MAX_STATE_BYTES = 16 * 1024 * 1024
 MAX_REGISTRATION_BYTES = 8_192
 MAX_RECEIPT_BYTES = 16_384
 MAX_DATA_BYTES = 64_000
@@ -46,6 +47,7 @@ HTTP_REQUEST_TIMEOUT_SECONDS = 15
 SCREENSHOT_RETENTION_SECONDS = 10 * 60
 PENDING_TTL_SECONDS = 180
 COMPLETION_TTL_SECONDS = 600
+STATE_FILE_ENV = "IOS_ASSISTANT_RECEIVER_STATE_PATH"
 ERROR_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_.-]{0,63}$")
 
 
@@ -99,6 +101,156 @@ def _hash_capability(value: str) -> bytes:
     return hashlib.sha256(value.encode("ascii")).digest()
 
 
+def _state_file() -> Path:
+    configured = os.environ.get(STATE_FILE_ENV)
+    path = Path(configured).expanduser() if configured else DATA_DIR / "receiver-state.json"
+    parent = path.parent
+    if parent.is_symlink():
+        raise IPhoneError(f"Refusing receiver state under symbolic-link directory: {parent}")
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    information = parent.stat()
+    if information.st_uid != os.getuid() or stat.S_IMODE(information.st_mode) != 0o700:
+        raise IPhoneError(f"Receiver state directory must be operator-owned mode 0700: {parent}")
+    if path.is_symlink():
+        raise IPhoneError(f"Refusing symbolic-link receiver state file: {path}")
+    return path
+
+
+def _pending_from_json(value: object) -> PendingRequest:
+    if not isinstance(value, dict):
+        raise IPhoneError("Receiver pending state is malformed.")
+    request_id = value.get("request_id")
+    capability_hash = value.get("capability_hash")
+    expected_action = value.get("expected_action")
+    expires_at = value.get("expires_at")
+    if (
+        not _valid_request_id(request_id)
+        or not isinstance(capability_hash, str)
+        or re.fullmatch(r"[0-9a-f]{64}", capability_hash) is None
+        or not _valid_action(expected_action)
+        or not isinstance(expires_at, (int, float))
+    ):
+        raise IPhoneError("Receiver pending state contains invalid fields.")
+    return PendingRequest(request_id, bytes.fromhex(capability_hash), expected_action, float(expires_at))
+
+
+def _completion_from_json(value: object) -> Completion:
+    if not isinstance(value, dict):
+        raise IPhoneError("Receiver completion state is malformed.")
+    request_id = value.get("request_id")
+    action = value.get("action")
+    status = value.get("status")
+    data = value.get("data")
+    error_code = value.get("error_code")
+    created_at = value.get("created_at")
+    if (
+        not _valid_request_id(request_id)
+        or not _valid_action(action)
+        or status not in {"completed", "failed", "timeout"}
+        or not isinstance(data, dict)
+        or (error_code is not None and (not isinstance(error_code, str) or ERROR_CODE_PATTERN.fullmatch(error_code) is None))
+        or not isinstance(created_at, (int, float))
+    ):
+        raise IPhoneError("Receiver completion state contains invalid fields.")
+    return Completion(request_id, action, status, dict(data), error_code, float(created_at))
+
+
+def _load_state_locked() -> None:
+    path = _state_file()
+    if not path.exists():
+        PENDING.clear()
+        COMPLETIONS.clear()
+        return
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise IPhoneError(f"Could not open receiver state file: {path}") from error
+    try:
+        information = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(information.st_mode)
+            or information.st_uid != os.getuid()
+            or stat.S_IMODE(information.st_mode) != 0o600
+            or information.st_size > MAX_STATE_BYTES
+        ):
+            raise IPhoneError("Receiver state file must be operator-owned mode 0600 and bounded.")
+        with os.fdopen(descriptor, "r", encoding="utf-8") as stream:
+            descriptor = -1
+            document = json.load(stream)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise IPhoneError("Receiver state file is unreadable or malformed.") from error
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    if not isinstance(document, dict) or document.get("version") != 1:
+        raise IPhoneError("Receiver state file has an unsupported version.")
+    pending_values = document.get("pending")
+    completion_values = document.get("completions")
+    if not isinstance(pending_values, list) or not isinstance(completion_values, list):
+        raise IPhoneError("Receiver state file is malformed.")
+    pending = [_pending_from_json(value) for value in pending_values]
+    completions = [_completion_from_json(value) for value in completion_values]
+    if len(pending) > MAX_PENDING or len(completions) > MAX_COMPLETIONS:
+        raise IPhoneError("Receiver state file exceeds bounded registry limits.")
+    PENDING.clear()
+    PENDING.update((value.request_id, value) for value in pending)
+    COMPLETIONS.clear()
+    COMPLETIONS.update((value.request_id, value) for value in completions)
+
+
+def _persist_state_locked() -> None:
+    path = _state_file()
+    while True:
+        document = {
+            "version": 1,
+            "pending": [
+                {
+                    "request_id": value.request_id,
+                    "capability_hash": value.capability_hash.hex(),
+                    "expected_action": value.expected_action,
+                    "expires_at": value.expires_at,
+                }
+                for value in PENDING.values()
+            ],
+            "completions": [dataclasses.asdict(value) for value in COMPLETIONS.values()],
+        }
+        encoded = json.dumps(
+            document,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        if len(encoded) <= MAX_STATE_BYTES:
+            break
+        if not COMPLETIONS:
+            raise IPhoneError("Receiver pending state exceeds its durable size limit.")
+        COMPLETIONS.pop(next(iter(COMPLETIONS)))
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.{time.time_ns()}.tmp")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(temporary, flags, 0o600)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            descriptor = -1
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        os.chmod(path, 0o600)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def _valid_request_id(value: object) -> bool:
     return isinstance(value, str) and REQUEST_ID_PATTERN.fullmatch(value) is not None
 
@@ -116,11 +268,13 @@ def _trim_text(value: str, limit: int = MAX_TEXT_CHARS) -> str:
     return value if len(value) <= limit else value[:limit] + "\n[truncated]"
 
 
-def _purge_locked(now: float | None = None) -> None:
+def _purge_locked(now: float | None = None) -> bool:
     instant = _now() if now is None else now
+    changed = False
     for request_id, pending in list(PENDING.items()):
         if pending.expires_at <= instant:
             PENDING.pop(request_id, None)
+            changed = True
             if request_id not in COMPLETIONS:
                 _store_completion_locked(
                     Completion(
@@ -135,6 +289,8 @@ def _purge_locked(now: float | None = None) -> None:
     for request_id, completion in list(COMPLETIONS.items()):
         if completion.created_at + COMPLETION_TTL_SECONDS <= instant:
             COMPLETIONS.pop(request_id, None)
+            changed = True
+    return changed
 
 
 def _bounded_map_insert(mapping: dict[str, Any], key: str, value: Any, limit: int = 200) -> None:
@@ -164,7 +320,9 @@ def register_pending(
     if not _now() < expiry <= _now() + PENDING_TTL_SECONDS:
         raise IPhoneError("receipt expiry is outside the allowed window")
     with STATE_LOCK:
-        _purge_locked()
+        _load_state_locked()
+        if _purge_locked():
+            _persist_state_locked()
         if request_id in PENDING or request_id in COMPLETIONS:
             raise IPhoneError("request id is already registered")
         if len(PENDING) >= MAX_PENDING:
@@ -175,10 +333,12 @@ def register_pending(
             expected_action=expected_action,
             expires_at=expiry,
         )
+        _persist_state_locked()
 
 
 def cancel_pending(request_id: str, *, status: str = "timeout") -> None:
     with STATE_LOCK:
+        _load_state_locked()
         _purge_locked()
         pending = PENDING.pop(request_id, None)
         if pending is not None:
@@ -192,16 +352,18 @@ def cancel_pending(request_id: str, *, status: str = "timeout") -> None:
                     created_at=_now(),
                 )
             )
+        _persist_state_locked()
 
 
 def poll_completion(request_id: str) -> dict[str, object]:
     if not _valid_request_id(request_id):
         raise IPhoneError("request id must be exactly 32 lowercase hexadecimal characters")
     with STATE_LOCK:
-        _purge_locked()
+        _load_state_locked()
+        changed = _purge_locked()
         completion = COMPLETIONS.get(request_id)
         if completion is not None:
-            return {
+            result = {
                 "ok": True,
                 "protocol_version": PROTOCOL_VERSION,
                 "state": "complete",
@@ -212,15 +374,21 @@ def poll_completion(request_id: str) -> dict[str, object]:
                 "data": completion.data,
                 "error_code": completion.error_code,
             }
+            if changed:
+                _persist_state_locked()
+            return result
         pending = PENDING.get(request_id)
         if pending is None:
-            return {
+            result = {
                 "ok": True,
                 "protocol_version": PROTOCOL_VERSION,
                 "state": "unknown",
                 "request_id": request_id,
             }
-        return {
+            if changed:
+                _persist_state_locked()
+            return result
+        result = {
             "ok": True,
             "protocol_version": PROTOCOL_VERSION,
             "state": "pending",
@@ -229,6 +397,9 @@ def poll_completion(request_id: str) -> dict[str, object]:
             "receipt_action": pending.expected_action,
             "expires_at": pending.expires_at,
         }
+        if changed:
+            _persist_state_locked()
+        return result
 
 
 def accept_receipt(
@@ -247,7 +418,9 @@ def accept_receipt(
     if error_code is not None and ERROR_CODE_PATTERN.fullmatch(error_code) is None:
         raise ValueError("invalid receipt error code")
     with STATE_LOCK:
-        _purge_locked()
+        _load_state_locked()
+        if _purge_locked():
+            _persist_state_locked()
         pending = PENDING.get(request_id)
         if pending is None:
             raise LookupError("unknown or already consumed request")
@@ -271,6 +444,7 @@ def accept_receipt(
                 created_at=_now(),
             )
         )
+        _persist_state_locked()
 
 
 def id_from_header(value: str) -> str | None:
