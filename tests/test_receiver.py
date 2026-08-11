@@ -358,6 +358,77 @@ class ReceiverTests(unittest.TestCase):
         )
         self.assertEqual(status, 400)
 
+    def test_generic_receipt_cannot_consume_data_action_capabilities(self):
+        cases = (
+            (
+                "alarm.list",
+                "/get-alarm",
+                json.dumps({"alarms": []}).encode(),
+                {"Content-Type": "application/json"},
+            ),
+            (
+                "screen.read",
+                "/text",
+                json.dumps({"screen": "private text"}).encode(),
+                {"Content-Type": "application/json"},
+            ),
+            (
+                "clipboard.get",
+                "/clipboard",
+                json.dumps({"clipboard": "private clipboard"}).encode(),
+                {"Content-Type": "application/json"},
+            ),
+            (
+                "screen.capture",
+                "/photo",
+                b"\x89PNG\r\n\x1a\ncorrelated-image",
+                {"Content-Type": "image/png"},
+            ),
+        )
+        for index, (action, endpoint, data, endpoint_headers) in enumerate(cases, start=1):
+            request_id = f"{index}" * 32
+            capability = f"{index + 4}" * 64
+            register_pending(request_id, capability, action)
+            receipt = json.dumps(
+                {
+                    "protocol_version": 2,
+                    "request_id": request_id,
+                    "receipt_action": action,
+                    "status": "completed",
+                }
+            ).encode()
+            status, body = self.request(
+                "POST",
+                "/receipt",
+                body=receipt,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Protocol-Version": "2",
+                    "X-Request-Id": request_id,
+                    "X-Receipt-Capability": capability,
+                },
+            )
+            self.assertEqual(status, 409, (action, body))
+            self.assertIn(b"dedicated endpoint", body)
+            self.assertEqual(poll_completion(request_id)["state"], "pending")
+
+            status, body = self.request(
+                "POST",
+                endpoint,
+                body=data,
+                headers={
+                    **endpoint_headers,
+                    "X-Protocol-Version": "2",
+                    "X-Request-Id": request_id,
+                    "X-Receipt-Capability": capability,
+                },
+            )
+            self.assertEqual(status, 200, (action, body))
+            result = poll_completion(request_id)
+            self.assertEqual(result["state"], "complete")
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(result["receipt_action"], action)
+
     def test_hardened_data_response_does_not_accept_static_token_alone(self):
         request_id = "c" * 32
         capability = "d" * 64
