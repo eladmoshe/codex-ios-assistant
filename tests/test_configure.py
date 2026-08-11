@@ -32,6 +32,9 @@ class ConfigureTests(unittest.TestCase):
                 'IPHONE_MSG_TARGET="target"\n'
                 'IPHONE_PUBLIC_URL="https://iphone.example"\n'
                 'IPHONE_RECEIVER_TOKEN="existing-private-token-with-32-chars"\n'
+                'IPHONE_RECEIVER_PORT="9876"\n'
+                'IPHONE_SENDER_SOCKET="/private/sender.sock"\n'
+                'IPHONE_REGISTRATION_SOCKET="/private/receiver.sock"\n'
             )
             config_file.chmod(0o600)
             result = subprocess.run(
@@ -49,6 +52,11 @@ class ConfigureTests(unittest.TestCase):
                 values["IPHONE_RECEIVER_TOKEN"], "existing-private-token-with-32-chars"
             )
             self.assertRegex(values["IPHONE_COMMAND_SECRET"], r"^[0-9a-f]{64}$")
+            self.assertEqual(values["IPHONE_RECEIVER_PORT"], "9876")
+            self.assertEqual(values["IPHONE_SENDER_SOCKET"], "/private/sender.sock")
+            self.assertEqual(
+                values["IPHONE_REGISTRATION_SOCKET"], "/private/receiver.sock"
+            )
             self.assertEqual(stat.S_IMODE(config_file.stat().st_mode), 0o600)
             self.assertNotIn(values["IPHONE_COMMAND_SECRET"], result.stdout)
 

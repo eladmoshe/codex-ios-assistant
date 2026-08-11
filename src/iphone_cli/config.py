@@ -152,6 +152,17 @@ def receiver_port() -> int:
     return port
 
 
+def validate_runtime_config() -> None:
+    """Fail closed before starting services with incomplete or invalid config."""
+    message_target()
+    public_url()
+    receiver_token()
+    command_secret()
+    receiver_port()
+    sender_socket()
+    registration_socket()
+
+
 def receiver_url() -> str:
     return f"http://127.0.0.1:{receiver_port()}"
 

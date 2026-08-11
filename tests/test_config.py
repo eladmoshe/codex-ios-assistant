@@ -18,6 +18,27 @@ from iphone_cli.errors import IPhoneError
 
 
 class ConfigTests(unittest.TestCase):
+    def test_service_config_validation_checks_every_required_value(self):
+        valid = {
+            "IPHONE_MSG_TARGET": "target",
+            "IPHONE_PUBLIC_URL": "https://iphone.example",
+            "IPHONE_RECEIVER_TOKEN": "x" * 32,
+            "IPHONE_COMMAND_SECRET": "a" * 64,
+        }
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            config, "CONFIG_DIR", Path(directory)
+        ), patch.object(config, "file_values", return_value={}):
+            Path(directory).chmod(0o700)
+            with patch.dict(os.environ, valid, clear=True):
+                config.validate_runtime_config()
+            for missing in valid:
+                with self.subTest(missing=missing), patch.dict(
+                    os.environ,
+                    {key: value for key, value in valid.items() if key != missing},
+                    clear=True,
+                ), self.assertRaises(IPhoneError):
+                    config.validate_runtime_config()
+
     def test_command_secret_requires_exact_lowercase_hex(self):
         with patch.dict(os.environ, {"IPHONE_COMMAND_SECRET": "a" * 64}):
             self.assertEqual(config.command_secret(), "a" * 64)
