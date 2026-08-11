@@ -181,7 +181,7 @@ def execute(
     environment["SCREENSHOT_TIMEOUT"] = str(max(1, int(timeout)))
     environment["CLIPBOARD_TIMEOUT"] = str(max(1, int(timeout)))
     environment["ALARM_TIMEOUT"] = str(max(1, int(timeout)))
-    helper_timeout = timeout + (RECEIPT_BRIDGE_OVERHEAD_SECONDS if operation.kind == "hola" else 5)
+    helper_timeout = timeout + RECEIPT_BRIDGE_OVERHEAD_SECONDS
     stdout = _run(command, timeout=helper_timeout, environment=environment)
 
     if operation.kind == "hola":
