@@ -12,18 +12,18 @@ VALIDATOR = ROOT / "scripts" / "validate-shortcut.py"
 
 
 class ShortcutValidatorTests(unittest.TestCase):
-    def test_rejects_condition_mode_that_inverts_on_iphone(self):
+    def run_validator(self, mutate):
         with TEMPLATE.open("rb") as source:
             actions = plistlib.load(source)
-        command_condition = next(
+        command_conditions = [
             action["WFWorkflowActionParameters"]
             for action in actions
             if action.get("WFWorkflowActionIdentifier") == "is.workflow.actions.conditional"
             and str(action.get("WFWorkflowActionParameters", {}).get("WFConditionalActionString", "")).startswith(
                 "hola "
             )
-        )
-        command_condition["WFCondition"] = 4
+        ]
+        mutate(command_conditions)
 
         with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
             plistlib.dump(actions, mutated)
@@ -34,9 +34,22 @@ class ShortcutValidatorTests(unittest.TestCase):
                 text=True,
                 check=False,
             )
+        return result
+
+    def test_rejects_condition_mode_that_inverts_on_iphone(self):
+        result = self.run_validator(lambda conditions: conditions[0].__setitem__("WFCondition", 4))
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must use begins-with mode 8", result.stderr)
+
+    def test_rejects_duplicate_or_overlapping_command_prefix(self):
+        def duplicate(conditions):
+            conditions[1]["WFConditionalActionString"] = conditions[0]["WFConditionalActionString"]
+
+        result = self.run_validator(duplicate)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("exact command set once each", result.stderr)
 
 
 if __name__ == "__main__":

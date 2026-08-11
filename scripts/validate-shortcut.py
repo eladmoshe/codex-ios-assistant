@@ -11,6 +11,28 @@ import sys
 PUBLIC_PLACEHOLDER = "__IOS_ASSISTANT_PUBLIC_URL__"
 TOKEN_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
 FORBIDDEN = ("@gmail.com", "/Users/", "trycloudflare.com")
+EXPECTED_COMMAND_CONDITIONS = {
+    "hola timer start",
+    "hola timer pause",
+    "hola timer resume",
+    "hola timer cancel",
+    "hola flashlight on",
+    "hola flashlight off",
+    "hola call",
+    "hola lowpower on",
+    "hola lowpower off",
+    "hola copytoclipboard",
+    "hola getclipboard",
+    "hola controlcenter open",
+    "hola controlcenter close",
+    "hola openurl",
+    "hola screentext",
+    "hola screenshot",
+    "hola homescreen",
+    "hola alarm get",
+    "hola alarm set",
+    "hola alarm off",
+}
 
 
 def walk(value: object):
@@ -64,8 +86,23 @@ def main() -> int:
         command = parameters.get("WFConditionalActionString")
         if isinstance(command, str) and command.startswith("hola "):
             command_conditions.append((index, command, parameters.get("WFCondition")))
-    if len(command_conditions) != 20:
-        raise SystemExit(f"expected twenty command conditions, found {len(command_conditions)}")
+    command_names = [command for _, command, _ in command_conditions]
+    if len(command_names) != len(EXPECTED_COMMAND_CONDITIONS) or set(command_names) != EXPECTED_COMMAND_CONDITIONS:
+        missing = sorted(EXPECTED_COMMAND_CONDITIONS.difference(command_names))
+        unexpected = sorted(set(command_names).difference(EXPECTED_COMMAND_CONDITIONS))
+        duplicates = sorted({command for command in command_names if command_names.count(command) > 1})
+        raise SystemExit(
+            "Shortcut command conditions must contain the exact command set once each: "
+            f"missing={missing}, unexpected={unexpected}, duplicates={duplicates}"
+        )
+    prefix_overlaps = sorted(
+        (left, right)
+        for left in command_names
+        for right in command_names
+        if left != right and right.startswith(left)
+    )
+    if prefix_overlaps:
+        raise SystemExit(f"Shortcut begins-with command conditions overlap: {prefix_overlaps}")
     incompatible_conditions = [
         f"action {index} ({command}) uses {condition!r}"
         for index, command, condition in command_conditions
