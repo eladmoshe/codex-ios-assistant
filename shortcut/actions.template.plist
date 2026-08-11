@@ -636,7 +636,7 @@
 			<key>GroupingIdentifier</key>
 			<string>DEC767AE-01AC-4245-9EEC-26B53F328F9F</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola timer pause</string>
 			<key>WFControlFlowMode</key>
@@ -1176,7 +1176,7 @@
 			<key>GroupingIdentifier</key>
 			<string>55B0EA4F-0DAE-41D8-8F3B-04E04E167D4A</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola timer resume</string>
 			<key>WFControlFlowMode</key>
@@ -1716,7 +1716,7 @@
 			<key>GroupingIdentifier</key>
 			<string>A670A0A1-DADC-4D4F-BC4F-0830A6813DE5</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola timer cancel</string>
 			<key>WFControlFlowMode</key>
@@ -2256,7 +2256,7 @@
 			<key>GroupingIdentifier</key>
 			<string>EDC0768C-9426-41F4-AD5F-C2D72E49D7FC</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola flashlight on</string>
 			<key>WFControlFlowMode</key>
@@ -2782,7 +2782,7 @@
 			<key>GroupingIdentifier</key>
 			<string>791CB8C8-FF6C-4F7B-8885-57550A9FA640</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola flashlight off</string>
 			<key>WFControlFlowMode</key>
@@ -3907,7 +3907,7 @@
 			<key>GroupingIdentifier</key>
 			<string>E37A4D10-F584-4897-92F1-023FFD11CA2D</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola lowpower on</string>
 			<key>WFControlFlowMode</key>
@@ -4433,7 +4433,7 @@
 			<key>GroupingIdentifier</key>
 			<string>97A25E98-040C-4352-8776-DC5D9B0DB316</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola lowpower off</string>
 			<key>WFControlFlowMode</key>
@@ -5536,7 +5536,7 @@
 			<key>GroupingIdentifier</key>
 			<string>ED21944C-4653-4747-885D-59E17926A91E</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola getclipboard</string>
 			<key>WFControlFlowMode</key>
@@ -5954,7 +5954,7 @@
 			<key>GroupingIdentifier</key>
 			<string>E357F68E-73E0-427F-A5B5-4315DC312F59</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola controlcenter open</string>
 			<key>WFControlFlowMode</key>
@@ -6492,7 +6492,7 @@
 			<key>GroupingIdentifier</key>
 			<string>3DAC4870-9540-4103-A605-680FA43A0B6F</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola controlcenter close</string>
 			<key>WFControlFlowMode</key>
@@ -8516,7 +8516,7 @@
 			<key>GroupingIdentifier</key>
 			<string>7207BF3F-A5A1-4A12-9C51-10DEFE1537D3</string>
 			<key>WFCondition</key>
-			<integer>4</integer>
+			<integer>8</integer>
 			<key>WFConditionalActionString</key>
 			<string>hola homescreen</string>
 			<key>WFControlFlowMode</key>

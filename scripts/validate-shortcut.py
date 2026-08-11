@@ -55,6 +55,27 @@ def main() -> int:
         raise SystemExit(f"unsupported iPhone screen actions present: {', '.join(present_unsupported)}")
     if "is.workflow.actions.getonscreencontent" not in identifiers:
         raise SystemExit("iPhone-compatible on-screen content action is missing")
+
+    command_conditions = []
+    for index, action in enumerate(actions):
+        if action.get("WFWorkflowActionIdentifier") != "is.workflow.actions.conditional":
+            continue
+        parameters = action.get("WFWorkflowActionParameters", {})
+        command = parameters.get("WFConditionalActionString")
+        if isinstance(command, str) and command.startswith("hola "):
+            command_conditions.append((index, command, parameters.get("WFCondition")))
+    if len(command_conditions) != 20:
+        raise SystemExit(f"expected twenty command conditions, found {len(command_conditions)}")
+    incompatible_conditions = [
+        f"action {index} ({command}) uses {condition!r}"
+        for index, command, condition in command_conditions
+        if condition != 8
+    ]
+    if incompatible_conditions:
+        raise SystemExit(
+            "iPhone command conditions must use begins-with mode 8: "
+            + "; ".join(incompatible_conditions)
+        )
     literal_web_origins = [
         value
         for value in strings
