@@ -23,6 +23,22 @@ Shortcuts on macOS copies actions under the pasteboard type `com.apple.shortcuts
 
 This relies on an undocumented Shortcuts pasteboard format. Apple may change it in a future macOS release.
 
+The first action extracts the received Message's `Content` property before
+coercing it to text. It is the only action that consumes `ExtensionInput`; all
+conditions and parser actions use its `ActionOutput`. Do not restore a generic
+Get Text action for the raw Message object, because rich Message input can
+coerce into multiple values.
+
+## Update the stable Shortcut in place
+
+For maintenance, keep the existing `iOS Assistant` Shortcut and its iPhone
+Message automation target. Run `scripts/copy-shortcut`, open that same
+Shortcut on the Mac, select and delete its existing actions, then paste the
+full action list once and save. This preserves the Shortcut identity that the
+automation invokes; do not create `iOS Assistant v2`, `v3`, or another
+versioned copy for a template update. Recheck the automation still points to
+`iOS Assistant` after iCloud sync.
+
 ## Branches
 
 The Shortcut handles:
@@ -47,7 +63,10 @@ The `openurl` branch echoes the canonical `--action` trailer dynamically, so
 typed actions such as `camera.open` and `messages.compose` are not collapsed
 to the generic `url.open` name.
 
-The alarm list branch filters for enabled alarms before it loops over results. The off branch filters enabled alarms by hour and minute, then disables all matches. Labels are not part of the comparison.
+The alarm list branch filters for enabled alarms before it loops over results and
+starts with an empty `AlarmLines` value, so a zero-match result is still posted
+as an empty alarm list. The off branch filters enabled alarms by hour and
+minute, then disables all matches. Labels are not part of the comparison.
 
 ## Inspect a native action
 
@@ -59,9 +78,9 @@ To study an action:
 2. Select the action or connected block and press Command-C.
 3. Run `swift scripts/inspect-shortcuts-clipboard.swift`.
 4. Record the action identifier, parameters, output UUIDs, and grouping identifiers.
-5. Apply the same structure to a working copy of the template.
+5. Apply the same structure to the stable Shortcut in place when maintaining an existing installation.
 6. Run `make test`.
-7. Paste the full action list into a new Shortcut and test the changed branch on an iPhone.
+7. Paste the full action list into the stable Shortcut and test the changed branch on an iPhone.
 
 An `ActionOutput` attachment refers to an earlier action through `OutputUUID`. Conditional and repeat blocks pair start and end actions with one `GroupingIdentifier`. Alarm predicates contain archived native objects; reproduce them in Shortcuts instead of guessing their plist format.
 

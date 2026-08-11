@@ -11,5 +11,7 @@ fi
 
 actions="$($python_bin "$repo_dir/scripts/render-shortcut.py")"
 /usr/bin/swift "$repo_dir/scripts/copy-shortcut-actions.swift" "$actions"
-print "Open Shortcuts on this Mac, create a blank shortcut, click its action canvas,"
-print "and press Command-V once. Name it iOS Assistant and let iCloud sync it."
+print "Fresh install: open Shortcuts, create a blank shortcut named iOS Assistant,"
+print "click its action canvas, and press Command-V once; then let iCloud sync it."
+print "Existing install: open the stable iOS Assistant shortcut, delete all actions,"
+print "and press Command-V once in place so its Message automation target is preserved."

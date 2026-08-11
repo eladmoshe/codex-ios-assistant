@@ -104,11 +104,15 @@ If `contacts` is missing, install Xcode Command Line Tools, accept the Xcode lic
 
 ## The pasted Shortcut is incomplete
 
-- Paste into a new blank Shortcut rather than an existing action graph.
+- For a fresh install, paste into a new blank Shortcut. For an update, open the
+  existing stable `iOS Assistant` Shortcut, select and delete all current
+  actions, then paste the full list in place so the Message automation target
+  stays unchanged.
 - Click the canvas before pressing Command-V.
 - Press Command-V once.
 - Rerun `scripts/copy-shortcut` if the pasteboard contains something else.
 - Check for `Copied and verified 244 Shortcuts actions` in the terminal.
 - Run `make test` to validate the committed plist.
 
-Keep the previous Shortcut until the replacement passes a test.
+Do not create a new versioned Shortcut or repoint the automation; save the
+existing Shortcut only after all 244 actions appear and validation passes.

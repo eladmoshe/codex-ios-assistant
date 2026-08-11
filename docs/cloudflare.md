@@ -48,7 +48,9 @@ but no screen, clipboard, capabilities, or alarm contents.
 1. Run `scripts/configure --url https://new-host.example.com`.
 2. Run `scripts/setup-cloudflare` to create the DNS route and replace the private tunnel config.
 3. Run `scripts/install-services`.
-4. Run `scripts/copy-shortcut`, then paste the new actions into a blank Shortcut.
-5. Point the iPhone Message automation at the new Shortcut.
+4. Run `scripts/copy-shortcut`, then replace all actions in the existing stable
+   `iOS Assistant` Shortcut in place.
+5. Keep the iPhone Message automation pointed at that same Shortcut identity.
 
-Keep the old Shortcut until `/health` and one response command work through the new hostname.
+Run `/health` and one response command through the new hostname before relying
+on the updated Shortcut.
