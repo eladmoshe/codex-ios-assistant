@@ -2,6 +2,7 @@ import json
 import unittest
 from unittest.mock import patch
 
+import iphone_cli.transport as transport
 from iphone_cli.errors import IPhoneError
 from iphone_cli.bridge import (
     MAX_COMMAND_BYTES,
@@ -22,6 +23,31 @@ from iphone_cli.protocol import (
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_outer_transport_budget_covers_sender_loss_and_receipt_reconciliation(self):
+        request_id = "d" * 32
+        operation = transport.Operation(
+            resource="timer",
+            action="pause",
+            kind="hola",
+            arguments=("timer", "pause"),
+            receipt_action="timer.pause",
+        )
+        receipt = json.dumps(
+            {
+                "protocol_version": PROTOCOL_VERSION,
+                "request_id": request_id,
+                "action": "timer.pause",
+                "receipt_action": "timer.pause",
+                "status": "timeout",
+                "data": {},
+                "error_code": "receipt_poll_unavailable",
+            }
+        )
+        with patch("iphone_cli.transport._run", return_value=receipt) as run:
+            result = transport.execute(operation, timeout=30, request_id=request_id)
+        self.assertEqual(result.status, "timeout")
+        self.assertEqual(run.call_args.kwargs["timeout"], 70)
+
     def test_every_shortcut_one_way_branch_has_one_canonical_receipt_action(self):
         cases = {
             "hola timer start 600": "timer.start",

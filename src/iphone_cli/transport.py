@@ -36,6 +36,11 @@ OperationKind = Literal[
     "alarm-read",
 ]
 BRIDGE_MODULE = "iphone_cli.bridge"
+# The bridge's receipt timeout starts only after sender dispatch. A lost sender
+# reply may consume 8s, and the final poll/cancel reconciliation can consume up
+# to three additional 8s socket budgets. Keep the supervising subprocess alive
+# through that ambiguity-safe path plus scheduling/teardown slack.
+RECEIPT_BRIDGE_OVERHEAD_SECONDS = 40
 
 
 @dataclass(frozen=True)
@@ -176,7 +181,8 @@ def execute(
     environment["SCREENSHOT_TIMEOUT"] = str(max(1, int(timeout)))
     environment["CLIPBOARD_TIMEOUT"] = str(max(1, int(timeout)))
     environment["ALARM_TIMEOUT"] = str(max(1, int(timeout)))
-    stdout = _run(command, timeout=timeout + 5, environment=environment)
+    helper_timeout = timeout + (RECEIPT_BRIDGE_OVERHEAD_SECONDS if operation.kind == "hola" else 5)
+    stdout = _run(command, timeout=helper_timeout, environment=environment)
 
     if operation.kind == "hola":
         try:
