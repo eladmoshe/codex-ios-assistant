@@ -7679,26 +7679,24 @@
 	</dict>
 	<dict>
 		<key>WFWorkflowActionIdentifier</key>
-		<string>is.workflow.actions.getonscreencontext</string>
+		<string>is.workflow.actions.getonscreencontent</string>
 		<key>WFWorkflowActionParameters</key>
 		<dict>
 			<key>UUID</key>
 			<string>2E1E487E-D902-4D5A-A3AA-390741E41BB8</string>
-			<key>WFOnScreenContextLimitEnabled</key>
-			<false/>
-			<key>WFOnScreenContextResultType</key>
-			<string>Text</string>
-			<key>WFOnScreenContextScope</key>
-			<string>All Visible</string>
 		</dict>
 	</dict>
 	<dict>
 		<key>WFWorkflowActionIdentifier</key>
-		<string>is.workflow.actions.getselectedtext</string>
+		<string>is.workflow.actions.gettext</string>
 		<key>WFWorkflowActionParameters</key>
 		<dict>
+			<key>CustomOutputName</key>
+			<string>Selected Text</string>
 			<key>UUID</key>
 			<string>87F9AEFE-D9F8-41D4-BDAF-27228D594FDE</string>
+			<key>WFTextActionText</key>
+			<string></string>
 		</dict>
 	</dict>
 	<dict>
