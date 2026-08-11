@@ -12,12 +12,15 @@ import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .config import (
+    CONFIG_DIR,
     DATA_DIR,
+    command_secret,
     ensure_socket_parent,
     message_target,
     receiver_token,
@@ -39,6 +42,7 @@ from .protocol import (
 MAX_COMMAND_BYTES = 4096
 MAX_REPLY_BYTES = 16_384
 MAX_REGISTRATION_REPLY_BYTES = 16_384
+WIRE_COMMAND_PATTERN = re.compile(r"^[0-9a-f]{64} hola ")
 
 
 def _read_line(connection: socket.socket, limit: int) -> bytes:
@@ -71,12 +75,12 @@ def _sender_payload(command: str) -> bytes:
 
     if (
         not isinstance(command, str)
-        or not command.startswith("hola ")
+        or WIRE_COMMAND_PATTERN.match(command) is None
         or "\r" in command
         or "\x00" in command
     ):
         raise IPhoneError(
-            "The sender accepts a hola command without carriage returns or NUL bytes."
+            "The sender accepts a secret-prefixed hola command without carriage returns or NUL bytes."
         )
     encoded = json.dumps(
         {"command": command},
@@ -327,6 +331,7 @@ def execute_one_way(
         action=action,
         request_id=request_id,
         capability=capability,
+        command_secret=command_secret(),
     )
     try:
         send_command(wire_command)
@@ -350,24 +355,38 @@ def execute_one_way(
 
 def _send_imessage(command: str) -> None:
     target = message_target()
-    script = [
-        "/usr/bin/osascript",
-        "-e",
-        "on run argv",
-        "-e",
-        'tell application id "com.apple.MobileSMS"',
-        "-e",
-        "set acct to 1st account whose service type is iMessage and enabled is true",
-        "-e",
-        "send (item 1 of argv) to participant (item 2 of argv) of acct",
-        "-e",
-        "end tell",
-        "-e",
-        "end run",
-        command,
-        target,
-    ]
-    completed = subprocess.run(script, capture_output=True, text=True, timeout=15, check=False)
+    descriptor, command_path = tempfile.mkstemp(prefix=".command-", dir=CONFIG_DIR)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            descriptor = -1
+            stream.write(command)
+        script = [
+            "/usr/bin/osascript",
+            "-e",
+            "on run argv",
+            "-e",
+            "set commandText to read POSIX file (item 1 of argv) as «class utf8»",
+            "-e",
+            'tell application id "com.apple.MobileSMS"',
+            "-e",
+            "set acct to 1st account whose service type is iMessage and enabled is true",
+            "-e",
+            "send commandText to participant (item 2 of argv) of acct",
+            "-e",
+            "end tell",
+            "-e",
+            "end run",
+            command_path,
+            target,
+        ]
+        completed = subprocess.run(
+            script, capture_output=True, text=True, timeout=15, check=False
+        )
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        Path(command_path).unlink(missing_ok=True)
     if completed.returncode != 0:
         detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
         raise IPhoneError(f"Messages automation failed: {detail}")
@@ -389,12 +408,12 @@ def _handle_sender_connection(connection: socket.socket) -> None:
         command = request.get("command") if isinstance(request, dict) else None
         if (
             not isinstance(command, str)
-            or not command.startswith("hola ")
+            or not command.startswith(f"{command_secret()} hola ")
             or "\r" in command
             or "\x00" in command
         ):
             raise IPhoneError(
-                "The sender accepts a hola command without carriage returns or NUL bytes."
+                "The sender accepts the configured secret-prefixed hola command without carriage returns or NUL bytes."
             )
         _send_imessage(command)
         response = {"ok": True}
@@ -493,6 +512,7 @@ def _execute_data_request(
         action=action,
         request_id=request_id,
         capability=capability,
+        command_secret=command_secret(),
     )
     try:
         send_command(wire_command)

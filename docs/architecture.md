@@ -7,7 +7,7 @@ The Mac sends commands through iMessage. The iPhone returns data through HTTPS.
 1. The `iphone` CLI validates arguments and builds either an Apple URL or a Shortcut command.
 2. The `iphone-control` skill tells Codex which CLI command to use and how to interpret its result.
 3. A per-user LaunchAgent accepts commands on a Unix socket and automates Messages in the macOS GUI session.
-4. A Message automation on the iPhone runs the 243-action Shortcut for messages that match `hola`.
+4. A Message automation on the iPhone runs the 244-action Shortcut for messages that match `hola`; every native branch additionally requires the private command prefix.
 5. The Shortcut runs an iOS action. Mutating branches post a versioned receipt to `/receipt`; branches that produce data post a bounded response to `/text`, `/photo`, `/clipboard`, or `/get-alarm` with the same receipt capability.
 6. A named Cloudflare Tunnel sends requests for the public hostname to the receiver on `127.0.0.1:8787`.
 7. The CLI polls the local receiver for text data or watches the private inbox for a screenshot until it gets a response or reaches the timeout.
@@ -15,7 +15,9 @@ The Mac sends commands through iMessage. The iPhone returns data through HTTPS.
 ## Command format
 
 The sender accepts one newline-delimited JSON request whose command begins
-with `hola `. The hardened CLI appends
+with the configured 64-lowercase-hex private secret and `hola `. The Shortcut
+normalizes the Message input to text and requires that exact prefix in every
+branch before any native action. The hardened CLI appends
 machine-owned fields to every phone command:
 
 ```text
@@ -23,7 +25,9 @@ machine-owned fields to every phone command:
 --receipt=<request id>.<64 lowercase hex> --action=<canonical action>
 ```
 
-These fields are generated after the receiver registers the pending request;
+The full wire form is `<private-command-secret> hola ... <metadata>`. The
+secret is generated into the mode-`0600` private config and rendered into the
+private Shortcut; it is never accepted from model arguments. These fields are generated after the receiver registers the pending request;
 they are not supplied by the model or by user command arguments. The current
 finite command forms are:
 
@@ -52,7 +56,7 @@ wire command. For example, `camera.open`, `messages.compose`, and `url.open`
 all use `hola openurl`, but the Shortcut echoes the trailer's `--action` value
 so the receiver returns the exact typed name that Nami requested.
 
-Use the CLI rather than writing these messages yourself. The CLI checks times, phone numbers, URLs, and durations. The sender enforces the command size and line format.
+Use the CLI rather than writing or forwarding these messages yourself. The CLI checks times, phone numbers, URLs, and durations. The sender enforces the exact configured command prefix, command size, and line format.
 
 ## Response format
 

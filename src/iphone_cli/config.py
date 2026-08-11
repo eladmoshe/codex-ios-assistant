@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import stat
 from pathlib import Path
@@ -26,6 +27,7 @@ LOG_DIR = Path(
 PRIVATE_SOCKET_DIR_MODE = 0o700
 PRIVATE_SOCKET_MODE = 0o600
 PRIVATE_CONFIG_FILE_MODE = 0o600
+COMMAND_SECRET_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 def file_values() -> dict[str, str]:
@@ -122,6 +124,13 @@ def receiver_token() -> str:
     return token
 
 
+def command_secret() -> str:
+    secret = value("IPHONE_COMMAND_SECRET", required=True)
+    if COMMAND_SECRET_PATTERN.fullmatch(secret) is None:
+        raise IPhoneError("IPHONE_COMMAND_SECRET must be exactly 64 lowercase hexadecimal characters.")
+    return secret
+
+
 def public_url() -> str:
     url = value("IPHONE_PUBLIC_URL", required=True).rstrip("/")
     if not url.startswith("https://") or "/" in url[len("https://") :]:
@@ -141,6 +150,17 @@ def receiver_port() -> int:
     if not 1 <= port <= 65535:
         raise IPhoneError("IPHONE_RECEIVER_PORT must be between 1 and 65535.")
     return port
+
+
+def validate_runtime_config() -> None:
+    """Fail closed before starting services with incomplete or invalid config."""
+    message_target()
+    public_url()
+    receiver_token()
+    command_secret()
+    receiver_port()
+    sender_socket()
+    registration_socket()
 
 
 def receiver_url() -> str:

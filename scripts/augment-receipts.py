@@ -17,6 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "shortcut" / "actions.template.plist"
 PUBLIC = "__IOS_ASSISTANT_PUBLIC_URL__"
 TOKEN = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
+COMMAND_SECRET = "__IOS_ASSISTANT_COMMAND_SECRET__"
+NORMALIZED_COMMAND_UUID = "7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21"
+TIMER_DURATION_UUID = "E9A5A5F0-0001-4CCC-8CCC-000000000001"
+TIMER_DURATION_PATTERN = r"(?i)[0-9]+(?=\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=timer\.start\s*$)"
 NAMESPACE = uuid.UUID("fae2f1d4-ae8e-55d4-bc9a-e4b0e6b1f5a8")
 
 
@@ -63,6 +67,70 @@ def extension_input() -> dict[str, object]:
         },
         "WFSerializationType": "WFTextTokenString",
     }
+
+
+def harden_command_input(actions: list[dict[str, object]]) -> bool:
+    """Normalize Message input and require the private prefix before any branch."""
+    changed = False
+    if not (
+        actions
+        and actions[0].get("WFWorkflowActionIdentifier") == "is.workflow.actions.detect.text"
+        and actions[0].get("WFWorkflowActionParameters", {}).get("UUID")
+        == NORMALIZED_COMMAND_UUID
+    ):
+        actions.insert(
+            0,
+            {
+                "WFWorkflowActionIdentifier": "is.workflow.actions.detect.text",
+                "WFWorkflowActionParameters": {
+                    "UUID": NORMALIZED_COMMAND_UUID,
+                    "WFInput": extension_input(),
+                },
+            },
+        )
+        changed = True
+
+    def visit(value: object, *, keep_extension_input: bool = False) -> None:
+        nonlocal changed
+        if isinstance(value, dict):
+            if value.get("Type") == "ExtensionInput" and not keep_extension_input:
+                value.clear()
+                value.update(
+                    {
+                        "OutputName": "Text",
+                        "OutputUUID": NORMALIZED_COMMAND_UUID,
+                        "Type": "ActionOutput",
+                    }
+                )
+                changed = True
+                return
+            for child in value.values():
+                visit(child, keep_extension_input=keep_extension_input)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child, keep_extension_input=keep_extension_input)
+
+    for index, item in enumerate(actions):
+        visit(item, keep_extension_input=index == 0)
+        parameters = item.get("WFWorkflowActionParameters", {})
+        condition = parameters.get("WFConditionalActionString")
+        if isinstance(condition, str) and condition.startswith("hola "):
+            parameters["WFConditionalActionString"] = f"{COMMAND_SECRET} {condition}"
+            changed = True
+        pattern = parameters.get("WFReplaceTextFind")
+        if isinstance(pattern, str) and r"^\s*hola" in pattern:
+            parameters["WFReplaceTextFind"] = pattern.replace(
+                r"^\s*hola", rf"^\s*{COMMAND_SECRET}\s+hola"
+            )
+            changed = True
+        if (
+            item.get("WFWorkflowActionIdentifier") == "is.workflow.actions.text.match"
+            and parameters.get("UUID") == TIMER_DURATION_UUID
+            and parameters.get("WFMatchTextPattern") != TIMER_DURATION_PATTERN
+        ):
+            parameters["WFMatchTextPattern"] = TIMER_DURATION_PATTERN
+            changed = True
+    return changed
 
 
 def receipt_action_parser(branch: str) -> tuple[list[dict[str, object]], str]:
@@ -419,11 +487,13 @@ def main() -> int:
         item.get("WFWorkflowActionParameters", {}).get("WFURL") == f"{PUBLIC}/receipt"
         for item in actions
     )
-    if len(actions) in {211, 243} and receipt_count == 16:
+    if len(actions) in {211, 243, 244} and receipt_count == 16:
         changed = False
         if len(actions) == 211 and upgrade_existing_receipts(actions):
             changed = True
         if migrate_existing_receipt_contract(actions):
+            changed = True
+        if harden_command_input(actions):
             changed = True
         for item in actions:
             parameters = item.get("WFWorkflowActionParameters", {})
@@ -525,6 +595,8 @@ def main() -> int:
         ("hola alarm get", "/get-alarm"),
     ):
         add_data_parser(actions, branch, suffix_path)
+
+    harden_command_input(actions)
 
     with TEMPLATE.open("wb") as output:
         plistlib.dump(actions, output, fmt=plistlib.FMT_XML, sort_keys=False)

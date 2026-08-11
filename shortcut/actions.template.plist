@@ -4,6 +4,25 @@
 <array>
 	<dict>
 		<key>WFWorkflowActionIdentifier</key>
+		<string>is.workflow.actions.detect.text</string>
+		<key>WFWorkflowActionParameters</key>
+		<dict>
+			<key>UUID</key>
+			<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
+			<key>WFInput</key>
+			<dict>
+				<key>Value</key>
+				<dict>
+					<key>Type</key>
+					<string>ExtensionInput</string>
+				</dict>
+				<key>WFSerializationType</key>
+				<string>WFTextTokenAttachment</string>
+			</dict>
+		</dict>
+	</dict>
+	<dict>
+		<key>WFWorkflowActionIdentifier</key>
 		<string>is.workflow.actions.conditional</string>
 		<key>WFWorkflowActionParameters</key>
 		<dict>
@@ -12,7 +31,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola timer start</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola timer start</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -32,8 +51,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -51,7 +74,7 @@
 			<key>WFMatchTextCaseSensitive</key>
 			<false/>
 			<key>WFMatchTextPattern</key>
-			<string>[0-9]+</string>
+			<string>(?i)[0-9]+(?=\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=timer\.start\s*$)</string>
 			<key>text</key>
 			<dict>
 				<key>Value</key>
@@ -60,8 +83,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -166,8 +193,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -299,8 +330,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -638,7 +673,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola timer pause</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola timer pause</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -658,8 +693,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -706,8 +745,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -839,8 +882,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -1178,7 +1225,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola timer resume</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola timer resume</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -1198,8 +1245,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -1246,8 +1297,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -1379,8 +1434,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -1718,7 +1777,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola timer cancel</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola timer cancel</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -1738,8 +1797,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -1786,8 +1849,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -1919,8 +1986,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -2258,7 +2329,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola flashlight on</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola flashlight on</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -2278,8 +2349,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -2312,8 +2387,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -2445,8 +2524,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -2784,7 +2867,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola flashlight off</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola flashlight off</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -2804,8 +2887,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -2841,8 +2928,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -2974,8 +3065,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -3313,7 +3408,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola call</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola call</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -3333,8 +3428,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -3357,8 +3456,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -3368,7 +3471,7 @@
 				<string>WFTextTokenString</string>
 			</dict>
 			<key>WFReplaceTextFind</key>
-			<string>(?i)(?:^\s*hola\s*(?:call\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
+			<string>(?i)(?:^\s*__IOS_ASSISTANT_COMMAND_SECRET__\s+hola\s*(?:call\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
 			<key>WFReplaceTextRegularExpression</key>
 			<true/>
 		</dict>
@@ -3437,8 +3540,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -3570,8 +3677,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -3909,7 +4020,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola lowpower on</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola lowpower on</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -3929,8 +4040,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -3963,8 +4078,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -4096,8 +4215,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -4435,7 +4558,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola lowpower off</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola lowpower off</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -4455,8 +4578,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -4492,8 +4619,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -4625,8 +4756,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -4964,7 +5099,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola copytoclipboard</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola copytoclipboard</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -4984,8 +5119,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -5008,8 +5147,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5019,7 +5162,7 @@
 				<string>WFTextTokenString</string>
 			</dict>
 			<key>WFReplaceTextFind</key>
-			<string>(?i)(?:^\s*hola\s*(?:copytoclipboard\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
+			<string>(?i)(?:^\s*__IOS_ASSISTANT_COMMAND_SECRET__\s+hola\s*(?:copytoclipboard\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
 			<key>WFReplaceTextRegularExpression</key>
 			<true/>
 		</dict>
@@ -5066,8 +5209,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5199,8 +5346,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5538,7 +5689,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola getclipboard</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola getclipboard</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -5558,8 +5709,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -5582,8 +5737,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5593,7 +5752,7 @@
 				<string>WFTextTokenString</string>
 			</dict>
 			<key>WFReplaceTextFind</key>
-			<string>(?i)(?:^\s*hola\s*(?:getclipboard\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
+			<string>(?i)(?:^\s*__IOS_ASSISTANT_COMMAND_SECRET__\s+hola\s*(?:getclipboard\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
 			<key>WFReplaceTextRegularExpression</key>
 			<true/>
 		</dict>
@@ -5626,8 +5785,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5956,7 +6119,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola controlcenter open</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola controlcenter open</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -5976,8 +6139,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -6022,8 +6189,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -6155,8 +6326,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -6494,7 +6669,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola controlcenter close</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola controlcenter close</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -6514,8 +6689,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -6562,8 +6741,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -6695,8 +6878,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7034,7 +7221,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola openurl</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola openurl</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -7054,8 +7241,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -7078,8 +7269,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7089,7 +7284,7 @@
 				<string>WFTextTokenString</string>
 			</dict>
 			<key>WFReplaceTextFind</key>
-			<string>(?i)(?:^\s*hola\s*(?:openurl\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
+			<string>(?i)(?:^\s*__IOS_ASSISTANT_COMMAND_SECRET__\s+hola\s*(?:openurl\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
 			<key>WFReplaceTextRegularExpression</key>
 			<true/>
 		</dict>
@@ -7136,8 +7331,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7269,8 +7468,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7608,7 +7811,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola screentext</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola screentext</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -7628,8 +7831,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -7652,8 +7859,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7663,7 +7874,7 @@
 				<string>WFTextTokenString</string>
 			</dict>
 			<key>WFReplaceTextFind</key>
-			<string>(?i)(?:^\s*hola\s*(?:screentext\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
+			<string>(?i)(?:^\s*__IOS_ASSISTANT_COMMAND_SECRET__\s+hola\s*(?:screentext\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
 			<key>WFReplaceTextRegularExpression</key>
 			<true/>
 		</dict>
@@ -7718,8 +7929,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -8131,7 +8346,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola screenshot</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola screenshot</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -8151,8 +8366,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -8175,8 +8394,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -8186,7 +8409,7 @@
 				<string>WFTextTokenString</string>
 			</dict>
 			<key>WFReplaceTextFind</key>
-			<string>(?i)(?:^\s*hola\s*(?:screenshot\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
+			<string>(?i)(?:^\s*__IOS_ASSISTANT_COMMAND_SECRET__\s+hola\s*(?:screenshot\s+)?|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
 			<key>WFReplaceTextRegularExpression</key>
 			<true/>
 		</dict>
@@ -8219,8 +8442,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -8518,7 +8745,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola homescreen</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola homescreen</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -8538,8 +8765,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -8572,8 +8803,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -8705,8 +8940,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -9044,7 +9283,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola alarm get</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola alarm get</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -9064,8 +9303,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -9090,8 +9333,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 				</dict>
@@ -9099,7 +9346,7 @@
 				<string>WFTextTokenString</string>
 			</dict>
 			<key>WFReplaceTextFind</key>
-			<string>(?i)(?:^\s*hola\s+alarm\s+get\s+|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
+			<string>(?i)(?:^\s*__IOS_ASSISTANT_COMMAND_SECRET__\s+hola\s+alarm\s+get\s+|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
 			<key>WFReplaceTextRegularExpression</key>
 			<true/>
 		</dict>
@@ -9407,8 +9654,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -9737,7 +9988,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola alarm set</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola alarm set</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -9757,8 +10008,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -9787,8 +10042,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 				</dict>
@@ -9839,8 +10098,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 				</dict>
@@ -9848,7 +10111,7 @@
 				<string>WFTextTokenString</string>
 			</dict>
 			<key>WFReplaceTextFind</key>
-			<string>(?i)(?:^\s*hola\s+alarm\s+set\s+(?:[01]\d|2[0-3]):[0-5]\d\s*|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
+			<string>(?i)(?:^\s*__IOS_ASSISTANT_COMMAND_SECRET__\s+hola\s+alarm\s+set\s+(?:[01]\d|2[0-3]):[0-5]\d\s*|\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=[a-z0-9._-]+\s*$)</string>
 			<key>WFReplaceTextRegularExpression</key>
 			<true/>
 		</dict>
@@ -9940,8 +10203,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -10073,8 +10340,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -10412,7 +10683,7 @@
 			<key>WFCondition</key>
 			<integer>8</integer>
 			<key>WFConditionalActionString</key>
-			<string>hola alarm off</string>
+			<string>__IOS_ASSISTANT_COMMAND_SECRET__ hola alarm off</string>
 			<key>WFControlFlowMode</key>
 			<integer>0</integer>
 			<key>WFInput</key>
@@ -10432,8 +10703,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -10458,8 +10733,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 				</dict>
@@ -10789,8 +11068,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -10922,8 +11205,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>

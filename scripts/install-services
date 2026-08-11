@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import plistlib
+import pwd
 import shutil
 import subprocess
 
@@ -19,6 +20,24 @@ TUNNEL_CONFIG = CONFIG_DIR / "cloudflared.yml"
 LOG_DIR = Path.home() / "Library" / "Logs" / "codex-ios-assistant"
 AGENT_DIR = Path.home() / "Library" / "LaunchAgents"
 DOMAIN = f"gui/{os.getuid()}"
+ACCOUNT = pwd.getpwuid(os.getuid())
+FILE_BACKED_ENVIRONMENT = {
+    "HOME": ACCOUNT.pw_dir,
+    "USER": ACCOUNT.pw_name,
+    "LOGNAME": ACCOUNT.pw_name,
+    "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+}
+
+
+def launchagent_validation_environment() -> dict[str, str]:
+    """Match the file-backed config environment used by generated jobs."""
+    return dict(FILE_BACKED_ENVIRONMENT)
+
+
+def file_backed_python(module: str) -> list[str]:
+    """Run a service without inheriting shell or launchd-manager overrides."""
+    assignments = [f"{name}={value}" for name, value in FILE_BACKED_ENVIRONMENT.items()]
+    return ["/usr/bin/env", "-i", *assignments, str(PYTHON), "-m", module]
 
 
 def plist(label: str, arguments: list[str], log_name: str) -> dict[str, object]:
@@ -51,6 +70,22 @@ def main() -> int:
         raise SystemExit("Run ./scripts/install first.")
     if not CONFIG_FILE.is_file():
         raise SystemExit("Run ./scripts/configure first.")
+    validation = subprocess.run(
+        [
+            str(PYTHON),
+            "-c",
+            "from iphone_cli.config import validate_runtime_config; validate_runtime_config()",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=launchagent_validation_environment(),
+    )
+    if validation.returncode != 0:
+        raise SystemExit(
+            "Private config is incomplete or invalid; "
+            "run ./scripts/configure --non-interactive first."
+        )
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.chmod(0o700)
     AGENT_DIR.mkdir(parents=True, exist_ok=True)
@@ -59,7 +94,7 @@ def main() -> int:
         "io.github.codex-ios-assistant.sender",
         plist(
             "io.github.codex-ios-assistant.sender",
-            [str(PYTHON), "-m", "iphone_cli.bridge", "sender"],
+            [*file_backed_python("iphone_cli.bridge"), "sender"],
             "sender",
         ),
     )
@@ -67,7 +102,7 @@ def main() -> int:
         "io.github.codex-ios-assistant.receiver",
         plist(
             "io.github.codex-ios-assistant.receiver",
-            [str(PYTHON), "-m", "iphone_cli.receiver"],
+            file_backed_python("iphone_cli.receiver"),
             "receiver",
         ),
     )

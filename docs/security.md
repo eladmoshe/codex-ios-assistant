@@ -4,7 +4,7 @@ This project connects Codex, Messages, an iPhone Shortcut, and a public hostname
 
 ## Files that must stay private
 
-- `~/.config/codex-ios-assistant/config.env` contains the iMessage target and receiver token.
+- `~/.config/codex-ios-assistant/config.env` contains the iMessage target, receiver token, and private command secret.
 - `~/.config/codex-ios-assistant/cloudflared.yml` names the tunnel credentials file.
 - `~/.cloudflared/<tunnel-id>.json` authorizes the tunnel.
 - `build/ios-assistant-actions.plist` contains the receiver hostname and token.
@@ -56,11 +56,24 @@ The sender listens on a mode-`0600` Unix socket under the private
 UID when macOS provides one, validates the parent/socket owner and mode, and
 accepts newline-delimited UTF-8 JSON requests up to 4 KiB. JSON escaping keeps
 embedded newlines and multibyte opaque values representable; carriage returns
-and NUL bytes are rejected. Commands must begin with `hola `. The sender runs
+and NUL bytes are rejected. Wire commands must begin with the configured
+64-lowercase-hex private command secret followed by `hola `. The sender runs
 fixed AppleScript through `/usr/bin/osascript`; clients cannot choose the
 program or script.
 
-Restrict the iPhone Message automation to the expected sender and messages containing `hola`. Do not add a Shortcut branch that turns message text into arbitrary commands or runs an arbitrary Shortcut.
+The current Shortcut requires that same private secret in every branch condition
+before it performs a native action. This is the pre-mutation authorization
+boundary: a plain `hola` message cannot match a branch, even though iOS starts
+the automation. The rendered Shortcut contains the secret and must remain
+private. Receipt capabilities authenticate the result after execution; they do
+not replace this command gate.
+
+Restrict the iPhone Message automation to the expected sender when self-message
+matching works reliably. `Any Sender` is supported only with the current
+secret-gated Shortcut and a private self-iMessage target; the `hola` content
+filter should still remain as defense in depth. Do not add a branch that omits
+the private prefix, turns arbitrary message text into commands, or runs an
+arbitrary Shortcut.
 
 The CLI opens message drafts for review. It does not send them. Commerce and rideshare links open a page without placing an order or requesting a ride.
 

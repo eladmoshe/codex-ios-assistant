@@ -20,7 +20,7 @@ class ShortcutValidatorTests(unittest.TestCase):
             for action in actions
             if action.get("WFWorkflowActionIdentifier") == "is.workflow.actions.conditional"
             and str(action.get("WFWorkflowActionParameters", {}).get("WFConditionalActionString", "")).startswith(
-                "hola "
+                "__IOS_ASSISTANT_COMMAND_SECRET__ hola "
             )
         ]
         mutate(command_conditions)
@@ -50,6 +50,41 @@ class ShortcutValidatorTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("exact command set once each", result.stderr)
+
+    def test_rejects_raw_message_object_condition_input(self):
+        def restore_raw_input(conditions):
+            conditions[0]["WFInput"] = {
+                "Value": {"Type": "ExtensionInput"},
+                "WFSerializationType": "WFTextTokenAttachment",
+            }
+
+        result = self.run_validator(restore_raw_input)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("raw Message automation input", result.stderr)
+
+    def test_rejects_timer_parser_that_can_read_secret_digits(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        timer_parser = next(
+            action["WFWorkflowActionParameters"]
+            for action in actions
+            if action.get("WFWorkflowActionIdentifier") == "is.workflow.actions.text.match"
+            and action.get("WFWorkflowActionParameters", {}).get("UUID")
+            == "E9A5A5F0-0001-4CCC-8CCC-000000000001"
+        )
+        timer_parser["WFMatchTextPattern"] = "[0-9]+"
+        with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
+            plistlib.dump(actions, mutated)
+            mutated.flush()
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), mutated.name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("timer duration parser", result.stderr)
 
 
 if __name__ == "__main__":

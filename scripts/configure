@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create the three-value user configuration outside the repository."""
+"""Create the four-value user configuration outside the repository."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import secrets
 import shlex
+import re
+import stat
 from urllib.parse import urlsplit
 
 
@@ -18,12 +20,32 @@ CONFIG_DIR = Path(
     )
 ).expanduser()
 CONFIG_FILE = CONFIG_DIR / "config.env"
+COMMAND_SECRET_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+PRESERVED_OPTIONAL_KEYS = (
+    "IPHONE_RECEIVER_PORT",
+    "IPHONE_SENDER_SOCKET",
+    "IPHONE_REGISTRATION_SOCKET",
+)
 
 
 def existing_values() -> dict[str, str]:
     values: dict[str, str] = {}
-    if not CONFIG_FILE.is_file():
+    if not CONFIG_FILE.exists():
         return values
+    file_status = CONFIG_FILE.lstat()
+    parent_status = CONFIG_DIR.lstat()
+    if (
+        not stat.S_ISREG(file_status.st_mode)
+        or file_status.st_uid != os.getuid()
+        or stat.S_IMODE(file_status.st_mode) != 0o600
+        or not stat.S_ISDIR(parent_status.st_mode)
+        or parent_status.st_uid != os.getuid()
+        or stat.S_IMODE(parent_status.st_mode) != 0o700
+    ):
+        raise SystemExit(
+            f"Refusing to read insecure configuration at {CONFIG_FILE}; "
+            "require an owned regular mode-0600 file under an owned mode-0700 directory."
+        )
     for raw_line in CONFIG_FILE.read_text().splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -48,17 +70,31 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Configure codex-ios-assistant")
     parser.add_argument("--target", help="your own iMessage email address or phone number")
     parser.add_argument("--url", help="stable HTTPS receiver origin")
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="preserve existing target and URL while backfilling generated secrets",
+    )
     parser.add_argument("--force-token", action="store_true", help="rotate the receiver token")
+    parser.add_argument(
+        "--force-command-secret",
+        action="store_true",
+        help="rotate the private iMessage command prefix",
+    )
     args = parser.parse_args()
 
     current = existing_values()
-    target = args.target or prompt(
-        "iMessage address that reaches this iPhone", current.get("IPHONE_MSG_TARGET", "")
-    )
-    public_url = args.url or prompt(
-        "Cloudflare HTTPS origin (for example https://iphone.example.com)",
-        current.get("IPHONE_PUBLIC_URL", ""),
-    )
+    if args.non_interactive:
+        target = args.target or current.get("IPHONE_MSG_TARGET", "")
+        public_url = args.url or current.get("IPHONE_PUBLIC_URL", "")
+    else:
+        target = args.target or prompt(
+            "iMessage address that reaches this iPhone", current.get("IPHONE_MSG_TARGET", "")
+        )
+        public_url = args.url or prompt(
+            "Cloudflare HTTPS origin (for example https://iphone.example.com)",
+            current.get("IPHONE_PUBLIC_URL", ""),
+        )
     public_url = public_url.rstrip("/")
     parsed_url = urlsplit(public_url)
     if parsed_url.scheme != "https" or not parsed_url.hostname or parsed_url.path not in {"", "/"}:
@@ -69,6 +105,9 @@ def main() -> int:
     token = current.get("IPHONE_RECEIVER_TOKEN", "")
     if args.force_token or len(token) < 32:
         token = secrets.token_urlsafe(32)
+    command_secret = current.get("IPHONE_COMMAND_SECRET", "")
+    if args.force_command_secret or COMMAND_SECRET_PATTERN.fullmatch(command_secret) is None:
+        command_secret = secrets.token_hex(32)
 
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     os.chmod(CONFIG_DIR, 0o700)
@@ -77,13 +116,19 @@ def main() -> int:
         f"IPHONE_MSG_TARGET={quote(target)}\n"
         f"IPHONE_PUBLIC_URL={quote(public_url)}\n"
         f"IPHONE_RECEIVER_TOKEN={quote(token)}\n"
+        f"IPHONE_COMMAND_SECRET={quote(command_secret)}\n"
+    )
+    contents += "".join(
+        f"{name}={quote(current[name])}\n"
+        for name in PRESERVED_OPTIONAL_KEYS
+        if current.get(name)
     )
     temporary = CONFIG_FILE.with_suffix(".env.tmp")
     temporary.write_text(contents)
     os.chmod(temporary, 0o600)
     os.replace(temporary, CONFIG_FILE)
     print(f"Wrote private configuration to {CONFIG_FILE}")
-    print("The receiver token was generated automatically and was not printed.")
+    print("The receiver token and command secret were generated automatically and were not printed.")
     return 0
 
 
