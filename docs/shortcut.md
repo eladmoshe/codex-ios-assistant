@@ -1,6 +1,6 @@
 # Shortcut maintenance
 
-`shortcut/actions.template.plist` contains 243 native Shortcuts actions. The committed template replaces private values with:
+`shortcut/actions.template.plist` contains 244 native Shortcuts actions. The committed template replaces private values with:
 
 ```text
 __IOS_ASSISTANT_PUBLIC_URL__

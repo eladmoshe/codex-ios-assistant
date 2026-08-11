@@ -4,6 +4,25 @@
 <array>
 	<dict>
 		<key>WFWorkflowActionIdentifier</key>
+		<string>is.workflow.actions.detect.text</string>
+		<key>WFWorkflowActionParameters</key>
+		<dict>
+			<key>UUID</key>
+			<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
+			<key>WFInput</key>
+			<dict>
+				<key>Value</key>
+				<dict>
+					<key>Type</key>
+					<string>ExtensionInput</string>
+				</dict>
+				<key>WFSerializationType</key>
+				<string>WFTextTokenAttachment</string>
+			</dict>
+		</dict>
+	</dict>
+	<dict>
+		<key>WFWorkflowActionIdentifier</key>
 		<string>is.workflow.actions.conditional</string>
 		<key>WFWorkflowActionParameters</key>
 		<dict>
@@ -32,8 +51,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -60,8 +83,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -166,8 +193,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -299,8 +330,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -658,8 +693,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -706,8 +745,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -839,8 +882,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -1198,8 +1245,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -1246,8 +1297,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -1379,8 +1434,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -1738,8 +1797,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -1786,8 +1849,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -1919,8 +1986,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -2278,8 +2349,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -2312,8 +2387,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -2445,8 +2524,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -2804,8 +2887,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -2841,8 +2928,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -2974,8 +3065,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -3333,8 +3428,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -3357,8 +3456,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -3437,8 +3540,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -3570,8 +3677,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -3929,8 +4040,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -3963,8 +4078,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -4096,8 +4215,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -4455,8 +4578,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -4492,8 +4619,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -4625,8 +4756,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -4984,8 +5119,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -5008,8 +5147,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5066,8 +5209,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5199,8 +5346,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5558,8 +5709,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -5582,8 +5737,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5626,8 +5785,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -5976,8 +6139,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -6022,8 +6189,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -6155,8 +6326,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -6514,8 +6689,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -6562,8 +6741,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -6695,8 +6878,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7054,8 +7241,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -7078,8 +7269,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7136,8 +7331,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7269,8 +7468,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7628,8 +7831,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -7652,8 +7859,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -7718,8 +7929,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -8151,8 +8366,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -8175,8 +8394,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -8219,8 +8442,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -8538,8 +8765,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -8572,8 +8803,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -8705,8 +8940,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -9064,8 +9303,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -9090,8 +9333,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 				</dict>
@@ -9407,8 +9654,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -9757,8 +10008,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -9787,8 +10042,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 				</dict>
@@ -9839,8 +10098,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 				</dict>
@@ -9940,8 +10203,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -10073,8 +10340,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -10432,8 +10703,12 @@
 								<string>WFCoercionVariableAggrandizement</string>
 							</dict>
 						</array>
+						<key>OutputName</key>
+						<string>Text</string>
+						<key>OutputUUID</key>
+						<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 						<key>Type</key>
-						<string>ExtensionInput</string>
+						<string>ActionOutput</string>
 					</dict>
 					<key>WFSerializationType</key>
 					<string>WFTextTokenAttachment</string>
@@ -10458,8 +10733,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 				</dict>
@@ -10789,8 +11068,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>
@@ -10922,8 +11205,12 @@
 					<dict>
 						<key>{0, 1}</key>
 						<dict>
+							<key>OutputName</key>
+							<string>Text</string>
+							<key>OutputUUID</key>
+							<string>7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21</string>
 							<key>Type</key>
-							<string>ExtensionInput</string>
+							<string>ActionOutput</string>
 						</dict>
 					</dict>
 					<key>string</key>

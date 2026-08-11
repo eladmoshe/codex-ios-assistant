@@ -419,7 +419,7 @@ def main() -> int:
         item.get("WFWorkflowActionParameters", {}).get("WFURL") == f"{PUBLIC}/receipt"
         for item in actions
     )
-    if len(actions) in {211, 243} and receipt_count == 16:
+    if len(actions) in {211, 243, 244} and receipt_count == 16:
         changed = False
         if len(actions) == 211 and upgrade_existing_receipts(actions):
             changed = True

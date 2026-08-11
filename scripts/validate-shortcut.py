@@ -11,6 +11,7 @@ import sys
 PUBLIC_PLACEHOLDER = "__IOS_ASSISTANT_PUBLIC_URL__"
 TOKEN_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
 FORBIDDEN = ("@gmail.com", "/Users/", "trycloudflare.com")
+NORMALIZED_COMMAND_UUID = "7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21"
 EXPECTED_COMMAND_CONDITIONS = {
     "hola timer start",
     "hola timer pause",
@@ -49,8 +50,28 @@ def main() -> int:
     path = Path(sys.argv[1]) if len(sys.argv) == 2 else Path("shortcut/actions.template.plist")
     with path.open("rb") as source:
         actions = plistlib.load(source)
-    if not isinstance(actions, list) or len(actions) != 243:
-        raise SystemExit(f"expected 243 Shortcut actions, found {len(actions) if isinstance(actions, list) else 'non-list'}")
+    if not isinstance(actions, list) or len(actions) != 244:
+        raise SystemExit(f"expected 244 Shortcut actions, found {len(actions) if isinstance(actions, list) else 'non-list'}")
+    normalization = actions[0]
+    normalization_parameters = normalization.get("WFWorkflowActionParameters", {})
+    if (
+        normalization.get("WFWorkflowActionIdentifier") != "is.workflow.actions.detect.text"
+        or normalization_parameters.get("UUID") != NORMALIZED_COMMAND_UUID
+        or normalization_parameters.get("WFInput", {}).get("Value", {}).get("Type") != "ExtensionInput"
+    ):
+        raise SystemExit("first action must normalize the Message automation input to text")
+    leaked_extension_inputs = [
+        index
+        for index, action in enumerate(actions[1:], start=1)
+        if any(
+            isinstance(value, dict) and value.get("Type") == "ExtensionInput"
+            for value in walk(action)
+        )
+    ]
+    if leaked_extension_inputs:
+        raise SystemExit(
+            f"actions still consume the raw Message automation input: {leaked_extension_inputs}"
+        )
 
     strings = [value for value in walk(actions) if isinstance(value, str)]
     public_count = sum(value.count(PUBLIC_PLACEHOLDER) for value in strings)
@@ -85,6 +106,13 @@ def main() -> int:
         parameters = action.get("WFWorkflowActionParameters", {})
         command = parameters.get("WFConditionalActionString")
         if isinstance(command, str) and command.startswith("hola "):
+            if not any(
+                isinstance(value, dict)
+                and value.get("Type") == "ActionOutput"
+                and value.get("OutputUUID") == NORMALIZED_COMMAND_UUID
+                for value in walk(parameters.get("WFInput", {}))
+            ):
+                raise SystemExit(f"action {index} does not compare normalized command text")
             command_conditions.append((index, command, parameters.get("WFCondition")))
     command_names = [command for _, command, _ in command_conditions]
     if len(command_names) != len(EXPECTED_COMMAND_CONDITIONS) or set(command_names) != EXPECTED_COMMAND_CONDITIONS:

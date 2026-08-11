@@ -51,6 +51,18 @@ class ShortcutValidatorTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("exact command set once each", result.stderr)
 
+    def test_rejects_raw_message_object_condition_input(self):
+        def restore_raw_input(conditions):
+            conditions[0]["WFInput"] = {
+                "Value": {"Type": "ExtensionInput"},
+                "WFSerializationType": "WFTextTokenAttachment",
+            }
+
+        result = self.run_validator(restore_raw_input)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("raw Message automation input", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
