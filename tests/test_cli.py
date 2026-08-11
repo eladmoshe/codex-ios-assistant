@@ -37,7 +37,10 @@ class CLITests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         value = json.loads(result.stdout)
         self.assertEqual(value["time"], "22:30")
-        self.assertEqual(value["command"][-3:], ["alarm", "off", "22:30"])
+        self.assertEqual(
+            value["command"][-5:],
+            ["alarm", "off", "22:30", "--receipt-action", "alarm.disable_at"],
+        )
 
     def test_alarm_off_rejects_invalid_time(self):
         result = run_cli("alarm", "off", "25:00", "--dry-run")
@@ -58,7 +61,11 @@ class CLITests(unittest.TestCase):
         value = json.loads(result.stdout)
         self.assertEqual(value["time"], "22:30")
         self.assertEqual(value["label"], "Wake up")
-        self.assertEqual(value["command"][-4:], ["alarm", "set", "22:30", "Wake up"])
+        self.assertEqual(
+            value["command"][4:8],
+            ["hola", "alarm", "set", "22:30"],
+        )
+        self.assertEqual(value["command"][-3:], ["Wake up", "--receipt-action", "alarm.set"])
 
     def test_alarm_set_rejects_invalid_time(self):
         result = run_cli("alarm", "set", "25:00", "--dry-run")
@@ -70,9 +77,9 @@ class CLITests(unittest.TestCase):
             helper = Path(directory) / "get-alarms"
             helper.write_text(
                 "#!/bin/sh\n"
-                "printf '%s' '{\"alarms\":[{\"time\":\"7:30 AM\","
+                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"alarm.list\",\"status\":\"completed\",\"data\":{\"alarms\":[{\"time\":\"7:30 AM\","
                 "\"label\":\"Wake up\",\"repeat_days\":\"Weekdays\","
-                "\"allows_snooze\":true,\"enabled\":true}]}'\n"
+                "\"allows_snooze\":true,\"enabled\":true}]}}'\n"
             )
             helper.chmod(0o755)
             result = run_cli(
@@ -91,7 +98,9 @@ class CLITests(unittest.TestCase):
         result = run_cli(
             "alarm",
             "list",
-            env={"IPHONE_ALARM_COMMAND": "/usr/bin/printf '{\"alarms\":[]}'"},
+            env={
+                "IPHONE_ALARM_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"alarm.list\",\"status\":\"completed\",\"data\":{\"alarms\":[]}}'"
+            },
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "No active alarms.\n")
@@ -110,7 +119,9 @@ class CLITests(unittest.TestCase):
         result = run_cli(
             "clipboard",
             "get",
-            env={"IPHONE_CLIPBOARD_COMMAND": "/usr/bin/printf clipboard-value"},
+            env={
+                "IPHONE_CLIPBOARD_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"clipboard.get\",\"status\":\"completed\",\"data\":{\"text\":\"clipboard-value\"}}'"
+            },
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
@@ -122,10 +133,105 @@ class CLITests(unittest.TestCase):
         result = run_cli(
             "clipboard",
             "get",
-            env={"IPHONE_CLIPBOARD_COMMAND": "/usr/bin/true"},
+            env={
+                "IPHONE_CLIPBOARD_COMMAND": "/usr/bin/printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"clipboard.get\",\"status\":\"completed\",\"data\":{\"text\":\"\"}}'"
+            },
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "<clipboard-contents></clipboard-contents>")
+
+    def test_screen_read_exposes_correlated_json_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            helper = Path(directory) / "screen"
+            helper.write_text(
+                "#!/bin/sh\n"
+                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"screen.read\",\"status\":\"completed\",\"data\":{\"text\":\"Settings\\nWi-Fi\"}}'\n"
+            )
+            helper.chmod(0o755)
+            result = run_cli(
+                "screen",
+                "read",
+                "--json",
+                env={"IPHONE_READ_SCREEN_COMMAND": str(helper)},
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertEqual(value["receipt_action"], "screen.read")
+        self.assertEqual(value["request_id"], "a" * 32)
+        self.assertEqual(value["protocol_version"], 2)
+        self.assertEqual(value["text"], "Settings\nWi-Fi")
+
+    def test_screenshot_exposes_correlated_json_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data_dir = root / "data"
+            inbox = data_dir / "inbox"
+            inbox.mkdir(parents=True)
+            image = inbox / "shot.png"
+            image.write_bytes(b"\x89PNG\r\n\x1a\nimage")
+            helper = root / "screenshot"
+            helper.write_text(
+                "#!/bin/sh\n"
+                f"printf '%s' '{{\"protocol_version\":2,\"request_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"receipt_action\":\"screen.capture\",\"status\":\"completed\",\"data\":{{\"path\":\"{image}\"}}}}'\n"
+            )
+            helper.chmod(0o755)
+            result = run_cli(
+                "screen",
+                "capture",
+                "--json",
+                env={
+                    "IPHONE_SCREENSHOT_COMMAND": str(helper),
+                    "IOS_ASSISTANT_DATA_DIR": str(data_dir),
+                },
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertEqual(value["receipt_action"], "screen.capture")
+        self.assertEqual(value["request_id"], "b" * 32)
+        self.assertTrue(value["path"].endswith("shot.png"))
+
+    def test_mac_local_json_results_get_a_valid_correlation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            helper = Path(directory) / "contacts"
+            helper.write_text("#!/bin/sh\nprintf '%s\\n' 'Dana' ' +15550101001'\n")
+            helper.chmod(0o755)
+            result = run_cli(
+                "contacts",
+                "search",
+                "Dana",
+                "--json",
+                env={"IPHONE_CONTACTS_COMMAND": str(helper)},
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertEqual(value["protocol_version"], 2)
+        self.assertRegex(value["request_id"], r"^[0-9a-f]{32}$")
+        self.assertEqual(value["receipt_action"], "contacts.search")
+
+    def test_messages_read_json_results_have_correlated_contract(self):
+        cases = (
+            (("chats", "--limit", "3"), "messages.chats"),
+            (("history", "--chat-id", "123"), "messages.history"),
+            (("search", "pizza", "--match", "contains", "--limit", "3"), "messages.search"),
+            (("group", "--chat-id", "123"), "messages.group"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            helper = Path(directory) / "imsg"
+            helper.write_text("#!/bin/sh\nprintf '%s\\n' '{\"id\":1,\"text\":\"hello\"}'\n")
+            helper.chmod(0o755)
+            for arguments, receipt_action in cases:
+                with self.subTest(arguments=arguments):
+                    result = run_cli(
+                        "messages",
+                        *arguments,
+                        "--json",
+                        env={"IPHONE_HISTORY_IMSG_COMMAND": str(helper)},
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    value = json.loads(result.stdout)
+                    self.assertEqual(value["protocol_version"], 2)
+                    self.assertRegex(value["request_id"], r"^[0-9a-f]{32}$")
+                    self.assertEqual(value["receipt_action"], receipt_action)
 
     def test_contacts_search_preserves_readable_output(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -279,6 +385,46 @@ class CLITests(unittest.TestCase):
         self.assertEqual(value["status"], "dry-run")
         self.assertEqual(value["seconds"], 600)
 
+    def test_json_dry_run_echoes_caller_request_id(self):
+        request_id = "0123456789abcdef0123456789abcdef"
+        result = run_cli(
+            "timer",
+            "start",
+            "10m",
+            "--dry-run",
+            "--json",
+            "--request-id",
+            request_id,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertEqual(value["request_id"], request_id)
+
+    def test_json_handler_failure_is_a_versioned_failed_envelope(self):
+        request_id = "fedcba9876543210fedcba9876543210"
+        result = run_cli(
+            "weather",
+            "open",
+            "--location",
+            "Chicago",
+            "--json",
+            "--request-id",
+            request_id,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertFalse(value["ok"])
+        self.assertEqual(value["protocol_version"], 2)
+        self.assertEqual(value["status"], "failed")
+        self.assertEqual(value["request_id"], request_id)
+        self.assertEqual(value["receipt_action"], "weather.open")
+        self.assertEqual(value["error_code"], "cli_error")
+
+    def test_invalid_request_id_is_rejected(self):
+        result = run_cli("timer", "pause", "--json", "--request-id", "not-an-id")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("request id must be exactly", result.stderr)
+
     def test_default_transport_uses_the_packaged_sender_bridge(self):
         result = run_cli("timer", "start", "10m", "--dry-run", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -286,6 +432,24 @@ class CLITests(unittest.TestCase):
         self.assertEqual(value["command"][0], str(Path(os.sys.executable)))
         self.assertEqual(value["command"][1:4], ["-m", "iphone_cli.bridge", "send"])
         self.assertEqual(value["command"][4:7], ["hola", "timer", "start"])
+        self.assertEqual(value["command"][-2:], ["--receipt-action", "timer.start"])
+
+    def test_openurl_transport_commands_keep_typed_receipt_actions(self):
+        cases = (
+            (("url", "open", "https://example.com"), "url.open"),
+            (("camera", "open"), "camera.open"),
+            (("messages", "open"), "messages.open"),
+            (("messages", "compose", "--to", "+15550101001", "--body", "hello"), "messages.compose"),
+            (("calculator", "evaluate", "40+2"), "calculator.evaluate"),
+            (("photos", "open"), "photos.open"),
+        )
+        for arguments, receipt_action in cases:
+            with self.subTest(arguments=arguments):
+                result = run_cli(*arguments, "--dry-run", "--json")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                value = json.loads(result.stdout)
+                self.assertEqual(value["receipt_action"], receipt_action)
+                self.assertEqual(value["command"][-2:], ["--receipt-action", receipt_action])
 
     def test_specific_message_url(self):
         guid = "3690DA00-7DDA-4B72-A847-197715B89D82"
@@ -363,14 +527,49 @@ class CLITests(unittest.TestCase):
             (("timer", "pause"), "Timer paused.\n"),
             (("low-power", "off"), "Low Power Mode turned off.\n"),
         )
-        for arguments, expected in cases:
-            with self.subTest(arguments=arguments):
-                result = run_cli(
-                    *arguments,
-                    env={"IPHONE_IMSG_COMMAND": "/usr/bin/true"},
-                )
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, expected)
+        with tempfile.TemporaryDirectory() as directory:
+            helper = Path(directory) / "receipt-helper"
+            helper.write_text(
+                "#!/bin/sh\n"
+                "case \"$*\" in\n"
+                "  *'hola openurl'*) action='url.open' ;;\n"
+                "  *'hola controlcenter close'*) action='control_center.set' ;;\n"
+                "  *'hola flashlight on'*) action='flashlight.set' ;;\n"
+                "  *'hola timer pause'*) action='timer.pause' ;;\n"
+                "  *'hola lowpower off'*) action='low_power.set' ;;\n"
+                "  *) exit 1 ;;\n"
+                "esac\n"
+                "printf '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"%s\",\"status\":\"completed\"}\\n' \"$action\"\n"
+            )
+            helper.chmod(0o755)
+            for arguments, expected in cases:
+                with self.subTest(arguments=arguments):
+                    result = run_cli(
+                        *arguments,
+                        env={"IPHONE_IMSG_COMMAND": str(helper)},
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, expected)
+
+    def test_json_failed_receipt_preserves_typed_non_success_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            helper = Path(directory) / "failed-receipt-helper"
+            helper.write_text(
+                "#!/bin/sh\n"
+                "printf '%s' '{\"protocol_version\":2,\"request_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"receipt_action\":\"timer.pause\",\"status\":\"failed\",\"error_code\":\"shortcut_failed\"}'\n"
+            )
+            helper.chmod(0o755)
+            result = run_cli(
+                "timer",
+                "pause",
+                "--json",
+                env={"IPHONE_IMSG_COMMAND": str(helper)},
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        value = json.loads(result.stdout)
+        self.assertFalse(value["ok"])
+        self.assertEqual(value["status"], "failed")
+        self.assertEqual(value["receipt_action"], "timer.pause")
 
     def test_bare_messages_command_shows_actions_and_examples(self):
         result = run_cli("messages")

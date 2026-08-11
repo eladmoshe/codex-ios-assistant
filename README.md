@@ -47,6 +47,11 @@ See [Architecture and protocol](docs/architecture.md) for request formats and tr
 
 The ChatGPT desktop and mobile apps are required only for the Remote workflow.
 
+Phone actions use a versioned, correlated receipt protocol. The CLI registers
+each request over a private Unix socket before sending the iMessage, and Nami
+reports success only after the matching one-time phone receipt arrives. A
+Messages delivery acknowledgment alone is never treated as execution.
+
 ## Install
 
 ```bash
@@ -61,7 +66,7 @@ brew install cloudflared steipete/tap/imsg
 
 Configuration has three values: the iMessage address that reaches your iPhone, a stable HTTPS hostname such as `https://iphone.example.com`, and a generated receiver token. The installer stores them in `~/.config/codex-ios-assistant/`, outside the repository.
 
-`scripts/copy-shortcut` puts 95 native Shortcuts actions on the Mac clipboard. Paste them once into a blank shortcut and name it `iOS Assistant`. After iCloud syncs it to your iPhone, create the automation that listens for commands:
+`scripts/copy-shortcut` puts 243 native Shortcuts actions on the Mac clipboard. Paste them once into a blank shortcut and name it `iOS Assistant`. After iCloud syncs it to your iPhone, create the automation that listens for commands:
 
 1. Open Shortcuts > Automation, tap the plus sign at the bottom, then choose New Automation > Message.
 2. Under `When I receive a message where`, set `Sender is` to your own iMessage contact.
@@ -80,14 +85,17 @@ iphone screen read --timeout 30
 iphone alarm list --timeout 30
 ```
 
-`iphone home` returns `requested` after Messages accepts the command. Commands that wait for data from the phone, including `screen read` and `alarm list`, return `completed` after the matching response reaches the Mac.
+`iphone home` returns `completed` only after the matching phone-side receipt
+arrives. Commands that wait for data from the phone, including `screen read`
+and `alarm list`, return `completed` after their capability-bound response
+reaches the Mac.
 
 ## Files
 
 | Path | Contents |
 | --- | --- |
 | `src/iphone_cli/` | CLI, Messages bridge, receiver, and URL builders |
-| `shortcut/actions.template.plist` | Sanitized 95-action Shortcut template |
+| `shortcut/actions.template.plist` | Sanitized 243-action Shortcut template |
 | `scripts/` | Install, configuration, tunnel, LaunchAgent, and clipboard tools |
 | `skills/iphone-control/` | Codex skill installed under `~/.agents/skills` |
 | `contacts/` | Swift Contacts search helper |

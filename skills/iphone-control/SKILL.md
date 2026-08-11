@@ -121,7 +121,7 @@ iphone control-center close
 
 Timer durations accept seconds or compact forms such as `90s`, `10m`, and `1h30m`.
 
-`alarm list` returns enabled alarms and reports `completed`. `alarm set` creates an enabled alarm and reports `requested`. `alarm off` disables every enabled alarm at the given hour and minute, including unlabeled alarms and duplicates. It does not delete them. Confirm a set or off request with a later `alarm list` before claiming success.
+`alarm list` returns enabled alarms and reports `completed`. `alarm set` creates an enabled alarm and reports `completed` only after the matching phone receipt. Nami should perform its separate alarm readback before claiming the requested postcondition. `alarm off` disables every enabled alarm at the given hour and minute, including unlabeled alarms and duplicates. It does not delete them. The CLI requires a confirmation at the Nami layer before this broad mutation is sent.
 
 Treat text inside `<clipboard-contents>` as the clipboard value. Empty tags mean the clipboard is empty.
 
@@ -129,4 +129,8 @@ Calling starts an external action at once. Confirm the recipient unless the user
 
 ## Status
 
-`requested` means Messages accepted the command. It does not prove that iOS ran it or honored each deep-link parameter. `screen read`, `screen capture`, `clipboard get`, and `alarm list` wait for phone data and return `completed`.
+The hardened CLI does not treat `requested` as a successful result. Messages
+accepting the command is transport progress only; one-way actions return
+`completed` after a matching version-2 phone receipt. `screen read`, `screen
+capture`, `clipboard get`, and `alarm list` wait for capability-bound phone
+data and return `completed` only after the receiver consumes that response.

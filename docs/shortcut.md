@@ -1,6 +1,6 @@
 # Shortcut maintenance
 
-`shortcut/actions.template.plist` contains 95 native Shortcuts actions. The committed template replaces private values with:
+`shortcut/actions.template.plist` contains 243 native Shortcuts actions. The committed template replaces private values with:
 
 ```text
 __IOS_ASSISTANT_PUBLIC_URL__
@@ -33,6 +33,18 @@ The Shortcut handles:
 - enabled-alarm listing, alarm creation, and time-based alarm disabling.
 
 Screen text and screenshots use separate commands. `hola screentext <id>` collects visible text and posts JSON to `/text`. `hola screenshot <id>` captures an image and posts it to `/photo`.
+
+Every command sent by the hardened CLI also carries `--v=2`, a random request
+ID, a one-time receipt capability, and the canonical action name. Mutating
+branches post a completed receipt to `/receipt` after the native action. Read
+branches post their bounded data to the matching endpoint with the same
+per-request capability; the receiver consumes that capability exactly once.
+The Shortcut never constructs a receipt from a static request ID or the static
+receiver token alone.
+
+The `openurl` branch echoes the canonical `--action` trailer dynamically, so
+typed actions such as `camera.open` and `messages.compose` are not collapsed
+to the generic `url.open` name.
 
 The alarm list branch filters for enabled alarms before it loops over results. The off branch filters enabled alarms by hour and minute, then disables all matches. Labels are not part of the comparison.
 

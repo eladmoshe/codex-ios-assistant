@@ -170,7 +170,7 @@ def messages_compose_url(address: str, body: str) -> str:
     return (
         "sms://open?"
         f"address={quote(address, safe='')}&"
-        f"body={quote(body, safe='')}&sendImmediately=true"
+        f"body={quote(body, safe='')}"
     )
 
 
@@ -186,7 +186,7 @@ def messages_group_compose_url(group_id: str, body: str) -> str:
     return (
         "sms://open?"
         f"groupid={group_id.upper()}&"
-        f"body={quote(body, safe='')}&sendImmediately=true"
+        f"body={quote(body, safe='')}"
     )
 
 

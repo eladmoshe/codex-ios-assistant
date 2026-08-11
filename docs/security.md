@@ -11,18 +11,54 @@ This project connects Codex, Messages, an iPhone Shortcut, and a public hostname
 - `~/.local/share/codex-ios-assistant/inbox/` contains screenshots.
 
 The installer keeps these files outside Git or under ignored paths. Config files and screenshots use mode `0600`; their parent directories use `0700`.
+`iphone doctor` and the runtime config loader accept the private config only
+when it is an operator-owned regular file with mode `0600` under an
+operator-owned mode `0700` directory; symlinks and shared permissions are
+rejected on every read.
 
 ## Receiver
 
-The receiver binds to `127.0.0.1`. Cloudflare is its public route. Phone-data endpoints require an exact `X-Auth` token with at least 32 characters. `/` and `/health` expose a fixed status string.
+The receiver binds to `127.0.0.1`. Cloudflare is its public route. `/` and
+`/health` expose a fixed status string. Hardened phone-data and receipt
+requests require protocol version 2, a 32-lowercase-hex-character request ID,
+and a random per-request capability in `X-Receipt-Capability`. The receiver compares the
+capability hash in constant time and consumes a matching pending request
+before returning success.
 
-Receiver logs include byte counts, alarm counts, and request IDs. They do not include screen text, clipboard values, or alarm details. Text responses live in memory. Screenshots remain on disk until you remove them.
+The receiver also exposes a separate mode-`0600` Unix registration socket for
+the local CLI. It accepts only the current user's peer UID and supports
+register, poll, and cancel operations. The public HTTP listener never accepts
+registrations. Pending requests expire, are bounded, and are not replayable.
+Their capability hashes and bounded completions are atomically persisted in an
+operator-owned mode-`0600` state file under the private data directory; raw
+capabilities are never written to disk.
 
-The token is a bearer secret stored in the Shortcut. Someone who obtains the token and hostname could submit false responses or read a response after guessing its request ID. The current protocol has no request signature, expiration, or replay check.
+Receiver logs include byte counts, alarm counts, and request IDs. They do not
+include screen text, clipboard values, capabilities, or alarm details. Hardened
+read responses are bounded before being returned to the CLI. Their correlated
+completion data, including private text, is retained for at most ten minutes in
+the operator-owned mode-`0600` state file so it survives a receiver restart;
+legacy static-token values remain memory-only. Receiver-owned screenshots are
+retained only for the same bounded ten-minute TTL, after which the inbox sweeper
+removes them; copy any screenshot needed for a longer-lived Nami log before
+that deadline.
+
+The static token remains in the rendered Shortcut for defense in depth and
+legacy interactive paths, but it is not sufficient for a Nami request. An
+attacker also needs the live, single-use capability registered for that exact
+request, plus its request ID and expected action. A lost receiver process
+therefore yields a timeout/inconclusive result rather than an inferred success.
 
 ## Messages sender
 
-The sender listens on a mode-`0600` Unix socket. It checks the peer UID when macOS provides one, rejects newlines and requests over 4 KiB, and accepts commands beginning with `hola `. It runs fixed AppleScript through `/usr/bin/osascript`; clients cannot choose the program or script.
+The sender listens on a mode-`0600` Unix socket under the private
+`~/.config/codex-ios-assistant/` directory (never `/tmp`). It checks the peer
+UID when macOS provides one, validates the parent/socket owner and mode, and
+accepts newline-delimited UTF-8 JSON requests up to 4 KiB. JSON escaping keeps
+embedded newlines and multibyte opaque values representable; carriage returns
+and NUL bytes are rejected. Commands must begin with `hola `. The sender runs
+fixed AppleScript through `/usr/bin/osascript`; clients cannot choose the
+program or script.
 
 Restrict the iPhone Message automation to the expected sender and messages containing `hola`. Do not add a Shortcut branch that turns message text into arbitrary commands or runs an arbitrary Shortcut.
 

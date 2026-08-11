@@ -35,7 +35,13 @@ Quick tunnels assign a new `trycloudflare.com` hostname at startup. A named tunn
 
 The receiver listens on `127.0.0.1`, so other machines on the local network cannot connect to port 8787. Cloudflare provides the public route.
 
-`/` and `/health` return a generic status without authentication. All endpoints that accept or return phone data require `X-Auth`. The final tunnel ingress rule returns 404 for unknown hostnames. Receiver logs include response sizes and request IDs, but no screen, clipboard, or alarm contents.
+`/` and `/health` return a generic status without authentication. Hardened
+phone-data and receipt endpoints require protocol version 2 plus the
+per-request `X-Request-Id` and `X-Receipt-Capability` headers. The static
+`X-Auth` token remains as defense in depth and for legacy paths; it cannot
+authorize a new request by itself. The final tunnel ingress rule returns 404
+for unknown hostnames. Receiver logs include response sizes and request IDs,
+but no screen, clipboard, capabilities, or alarm contents.
 
 ## Change the hostname
 

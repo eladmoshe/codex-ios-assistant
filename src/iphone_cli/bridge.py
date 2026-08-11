@@ -16,12 +16,29 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .config import DATA_DIR, message_target, receiver_token, receiver_url, sender_socket
+from .config import (
+    DATA_DIR,
+    ensure_socket_parent,
+    message_target,
+    receiver_token,
+    receiver_url,
+    registration_socket,
+    sender_socket,
+)
 from .errors import IPhoneError
+from .protocol import (
+    PROTOCOL_VERSION,
+    new_receipt_capability,
+    new_request_id,
+    protocol_command,
+    validate_action,
+    validate_request_id,
+)
 
 
 MAX_COMMAND_BYTES = 4096
 MAX_REPLY_BYTES = 16_384
+MAX_REGISTRATION_REPLY_BYTES = 16_384
 
 
 def _read_line(connection: socket.socket, limit: int) -> bytes:
@@ -36,16 +53,46 @@ def _read_line(connection: socket.socket, limit: int) -> bytes:
         if b"\n" in chunk:
             break
     data = b"".join(chunks)
-    if len(data) > limit:
+    line = data.split(b"\n", 1)[0]
+    if len(line) > limit:
         raise IPhoneError("Bridge message exceeded its size limit.")
-    return data.split(b"\n", 1)[0]
+    return line
+
+
+def _sender_payload(command: str) -> bytes:
+    """Encode one sender request and enforce the byte budget before sending.
+
+    ``ensure_ascii=False`` keeps UTF-8 opaque values compact while JSON still
+    escapes embedded newlines and the trailing framing delimiter remains a
+    single byte.  The limit is measured on the encoded JSON line (excluding
+    that delimiter), exactly as the receiver's bounded line reader measures
+    it.
+    """
+
+    if (
+        not isinstance(command, str)
+        or not command.startswith("hola ")
+        or "\r" in command
+        or "\x00" in command
+    ):
+        raise IPhoneError(
+            "The sender accepts a hola command without carriage returns or NUL bytes."
+        )
+    encoded = json.dumps(
+        {"command": command},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if len(encoded) > MAX_COMMAND_BYTES:
+        raise IPhoneError(
+            f"The sender command exceeds its {MAX_COMMAND_BYTES}-byte socket budget."
+        )
+    return encoded + b"\n"
 
 
 def send_command(command: str) -> None:
     """Ask the per-user sender agent to deliver one private command."""
-    if not command.startswith("hola ") or "\n" in command or "\r" in command:
-        raise IPhoneError("The sender accepts one single-line 'hola' command.")
-    payload = json.dumps({"command": command}, separators=(",", ":")).encode() + b"\n"
+    payload = _sender_payload(command)
     path = sender_socket()
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
@@ -66,6 +113,239 @@ def send_command(command: str) -> None:
     if not isinstance(reply, dict) or not reply.get("ok"):
         detail = reply.get("error") if isinstance(reply, dict) else None
         raise IPhoneError(str(detail or "The Messages sender service rejected the command."))
+
+
+def _registration_request(payload: dict[str, object]) -> dict[str, object]:
+    """Call the receiver's private registration/poll socket."""
+    encoded = json.dumps(payload, separators=(",", ":")).encode() + b"\n"
+    if len(encoded) > MAX_REGISTRATION_REPLY_BYTES:
+        raise IPhoneError("registration request exceeded its size limit")
+    path = registration_socket()
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(8)
+            connection.connect(str(path))
+            connection.sendall(encoded)
+            reply_bytes = _read_line(connection, MAX_REGISTRATION_REPLY_BYTES)
+    except (FileNotFoundError, ConnectionRefusedError) as error:
+        raise IPhoneError(
+            "The hardened receiver service is not running. Run scripts/install-services."
+        ) from error
+    except OSError as error:
+        raise IPhoneError(f"Could not reach the receiver registration service: {error}") from error
+    try:
+        reply = json.loads(reply_bytes)
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise IPhoneError("The receiver registration service returned an invalid response.") from error
+    if not isinstance(reply, dict) or not reply.get("ok"):
+        detail = reply.get("error") if isinstance(reply, dict) else None
+        raise IPhoneError(str(detail or "The receiver rejected the registration request."))
+    if reply.get("protocol_version") != PROTOCOL_VERSION:
+        raise IPhoneError("The receiver returned an unsupported protocol version.")
+    return reply
+
+
+def _register(request_id: str, capability: str, action: str, timeout: float) -> None:
+    validate_request_id(request_id)
+    validate_action(action)
+    response = _registration_request(
+        {
+            "op": "register",
+            "protocol_version": PROTOCOL_VERSION,
+            "request_id": request_id,
+            "capability": capability,
+            "action": action,
+            "expires_at": time.time() + min(max(timeout + 10, 30), 180),
+        }
+    )
+    if response.get("request_id") != request_id:
+        raise IPhoneError("The receiver returned a mismatched registration request id.")
+
+
+def _validate_poll_response(
+    response: dict[str, object],
+    *,
+    request_id: str,
+    expected_action: str,
+) -> None:
+    if response.get("request_id") != request_id:
+        raise IPhoneError("The receiver returned a mismatched receipt request id.")
+    if response.get("state") == "complete":
+        reported_action = response.get("receipt_action")
+        if reported_action != expected_action:
+            raise IPhoneError("The receiver returned a mismatched receipt action.")
+
+
+def _poll_registered(request_id: str, timeout: float, expected_action: str) -> dict[str, object]:
+    deadline = time.monotonic() + timeout
+    poll_error_seen = False
+    while time.monotonic() < deadline:
+        try:
+            response = _registration_request(
+                {
+                    "op": "poll",
+                    "protocol_version": PROTOCOL_VERSION,
+                    "request_id": request_id,
+                }
+            )
+            _validate_poll_response(
+                response,
+                request_id=request_id,
+                expected_action=expected_action,
+            )
+        except IPhoneError:
+            # Registration succeeded before possible Messages dispatch. Any
+            # later receiver outage or malformed poll response is ambiguous,
+            # never a definitive action failure. Keep polling for recovery and
+            # eventually return a typed timeout instead of inviting a retry.
+            poll_error_seen = True
+            time.sleep(0.5)
+            continue
+        state = response.get("state")
+        if state == "complete":
+            return response
+        if state == "unknown":
+            # Missing durable state after possible dispatch is ambiguous. It
+            # must never invite an automatic retry through a false definitive
+            # failure, and Messages acknowledgment is still not completion.
+            return {
+                "ok": True,
+                "protocol_version": PROTOCOL_VERSION,
+                "state": "complete",
+                "request_id": request_id,
+                "action": expected_action,
+                "receipt_action": expected_action,
+                "status": "timeout",
+                "data": {},
+                "error_code": "receipt_state_unknown",
+            }
+        time.sleep(0.5)
+    try:
+        cancel_response = _registration_request(
+            {
+                "op": "cancel",
+                "protocol_version": PROTOCOL_VERSION,
+                "request_id": request_id,
+            }
+        )
+        if cancel_response.get("request_id") not in {None, request_id}:
+            raise IPhoneError("The receiver returned a mismatched cancellation request id.")
+    except IPhoneError:
+        # The timeout remains the truthful result even if cancellation races a
+        # receiver restart.
+        return {
+            "ok": True,
+            "protocol_version": PROTOCOL_VERSION,
+            "state": "complete",
+            "request_id": request_id,
+            "action": expected_action,
+            "receipt_action": expected_action,
+            "status": "timeout",
+            "data": {},
+            "error_code": "receipt_poll_unavailable" if poll_error_seen else "receipt_timeout",
+        }
+    try:
+        response = _registration_request(
+            {
+                "op": "poll",
+                "protocol_version": PROTOCOL_VERSION,
+                "request_id": request_id,
+            }
+        )
+        _validate_poll_response(
+            response,
+            request_id=request_id,
+            expected_action=expected_action,
+        )
+        if response.get("state") == "complete":
+            return response
+    except IPhoneError:
+        pass
+    return {
+        "ok": True,
+        "protocol_version": PROTOCOL_VERSION,
+        "state": "complete",
+        "request_id": request_id,
+        "action": expected_action,
+        "receipt_action": expected_action,
+        "status": "timeout",
+        "data": {},
+        "error_code": "receipt_poll_unavailable" if poll_error_seen else "receipt_timeout",
+    }
+
+
+def _one_way_action(command: str) -> str:
+    words = command.split()
+    if len(words) < 2 or words[0] != "hola":
+        raise IPhoneError("The sender accepts a hola command for phone actions.")
+    key = tuple(words[1:3])
+    mapping = {
+        ("timer", "start"): "timer.start",
+        ("timer", "pause"): "timer.pause",
+        ("timer", "resume"): "timer.resume",
+        ("timer", "cancel"): "timer.cancel",
+        ("flashlight", "on"): "flashlight.set",
+        ("flashlight", "off"): "flashlight.set",
+        ("call",): "call.start",
+        ("lowpower", "on"): "low_power.set",
+        ("lowpower", "off"): "low_power.set",
+        ("copytoclipboard",): "clipboard.copy",
+        ("getclipboard",): "clipboard.get",
+        ("controlcenter", "open"): "control_center.set",
+        ("controlcenter", "close"): "control_center.set",
+        ("openurl",): "url.open",
+        ("screentext",): "screen.read",
+        ("screenshot",): "screen.capture",
+        ("homescreen",): "home.open",
+        ("alarm", "get"): "alarm.list",
+        ("alarm", "set"): "alarm.set",
+        ("alarm", "off"): "alarm.disable_at",
+    }
+    if (words[1],) in mapping:
+        return mapping[(words[1],)]
+    if key in mapping:
+        return mapping[key]
+    raise IPhoneError("Unsupported phone action command.")
+
+
+def execute_one_way(
+    command: str,
+    *,
+    timeout: float = 30,
+    expected_action: str | None = None,
+    request_id: str | None = None,
+) -> dict[str, object]:
+    """Send a finite Shortcut command and wait for its correlated receipt."""
+    action = expected_action or _one_way_action(command)
+    if expected_action is not None:
+        validate_action(expected_action)
+    request_id = validate_request_id(request_id) if request_id is not None else new_request_id()
+    capability = new_receipt_capability()
+    _register(request_id, capability, action, timeout)
+    wire_command = protocol_command(
+        command,
+        action=action,
+        request_id=request_id,
+        capability=capability,
+    )
+    try:
+        send_command(wire_command)
+    except IPhoneError:
+        # The sender may have handed the command to Messages and then lost its
+        # local socket response. Keep the durable registration alive and poll
+        # for the phone receipt; if none arrives, return timeout/unknown rather
+        # than a definitive failure that could prompt a duplicate retry.
+        pass
+    result = _poll_registered(request_id, timeout, action)
+    return {
+        "protocol_version": PROTOCOL_VERSION,
+        "request_id": request_id,
+        "action": result.get("action", action),
+        "receipt_action": result.get("receipt_action", action),
+        "status": result.get("status", "failed"),
+        "data": result.get("data", {}),
+        "error_code": result.get("error_code"),
+    }
 
 
 def _send_imessage(command: str) -> None:
@@ -110,10 +390,12 @@ def _handle_sender_connection(connection: socket.socket) -> None:
         if (
             not isinstance(command, str)
             or not command.startswith("hola ")
-            or "\n" in command
             or "\r" in command
+            or "\x00" in command
         ):
-            raise IPhoneError("The sender accepts one single-line 'hola' command.")
+            raise IPhoneError(
+                "The sender accepts a hola command without carriage returns or NUL bytes."
+            )
         _send_imessage(command)
         response = {"ok": True}
     except (IPhoneError, json.JSONDecodeError, UnicodeDecodeError) as error:
@@ -124,12 +406,12 @@ def _handle_sender_connection(connection: socket.socket) -> None:
 def run_sender() -> None:
     """Run the unsandboxed per-user Messages automation service."""
     path = sender_socket()
+    ensure_socket_parent(path)
     if path.exists():
         mode = path.stat().st_mode
         if not stat.S_ISSOCK(mode):
             raise IPhoneError(f"Refusing to replace non-socket path: {path}")
         path.unlink()
-    path.parent.mkdir(parents=True, exist_ok=True)
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         server.bind(str(path))
@@ -196,49 +478,75 @@ def _timeout(environment_name: str, default: int) -> int:
     return max(1, value)
 
 
-def read_screen() -> None:
-    request_id = _correlation_id()
-    _receiver_request("DELETE", f"/text/{request_id}")
-    send_command(f"hola screentext {request_id}")
-    text = _poll(f"/text/{request_id}", _timeout("READ_SCREEN_TIMEOUT", 30))
-    sys.stdout.write(text.decode("utf-8"))
+def _execute_data_request(
+    *,
+    action: str,
+    command: str,
+    timeout: int,
+    request_id: str | None = None,
+) -> dict[str, object]:
+    request_id = validate_request_id(request_id) if request_id is not None else new_request_id()
+    capability = new_receipt_capability()
+    _register(request_id, capability, action, timeout)
+    wire_command = protocol_command(
+        f"{command} {request_id}",
+        action=action,
+        request_id=request_id,
+        capability=capability,
+    )
+    try:
+        send_command(wire_command)
+    except IPhoneError:
+        # A lost sender response is ambiguous after possible Messages
+        # dispatch. Preserve the registration and let the correlated receipt
+        # or timeout determine the truthful result.
+        pass
+    return _poll_registered(request_id, timeout, action)
 
 
-def read_clipboard() -> None:
-    request_id = _correlation_id()
-    _receiver_request("DELETE", f"/clipboard/{request_id}")
-    send_command(f"hola getclipboard {request_id}")
-    value = _poll(f"/clipboard/{request_id}", _timeout("CLIPBOARD_TIMEOUT", 30))
-    sys.stdout.buffer.write(value)
+def read_screen(request_id: str | None = None) -> None:
+    result = _execute_data_request(
+        action="screen.read",
+        command="hola screentext",
+        timeout=_timeout("READ_SCREEN_TIMEOUT", 30),
+        request_id=request_id,
+    )
+    _write_data_receipt(result)
 
 
-def read_alarms() -> None:
-    request_id = _correlation_id()
-    _receiver_request("DELETE", f"/get-alarm/{request_id}")
-    send_command(f"hola alarm get {request_id}")
-    value = _poll(f"/get-alarm/{request_id}", _timeout("ALARM_TIMEOUT", 30))
-    sys.stdout.buffer.write(value)
+def read_clipboard(request_id: str | None = None) -> None:
+    result = _execute_data_request(
+        action="clipboard.get",
+        command="hola getclipboard",
+        timeout=_timeout("CLIPBOARD_TIMEOUT", 30),
+        request_id=request_id,
+    )
+    _write_data_receipt(result)
 
 
-def capture_screen() -> None:
-    request_id = _correlation_id()
-    inbox = DATA_DIR / "inbox"
-    inbox.mkdir(parents=True, exist_ok=True)
-    os.chmod(DATA_DIR, 0o700)
-    os.chmod(inbox, 0o700)
-    candidates = [inbox / f"shot-{request_id}.{extension}" for extension in ("png", "jpg", "bin")]
-    for candidate in candidates:
-        if candidate.is_file():
-            candidate.unlink()
-    send_command(f"hola screenshot {request_id}")
-    deadline = time.monotonic() + _timeout("SCREENSHOT_TIMEOUT", 45)
-    while time.monotonic() < deadline:
-        for candidate in candidates:
-            if candidate.is_file():
-                print(candidate.resolve())
-                return
-        time.sleep(0.5)
-    raise IPhoneError("Timed out waiting for the iPhone screenshot.")
+def read_alarms(request_id: str | None = None) -> None:
+    result = _execute_data_request(
+        action="alarm.list",
+        command="hola alarm get",
+        timeout=_timeout("ALARM_TIMEOUT", 30),
+        request_id=request_id,
+    )
+    _write_data_receipt(result)
+
+
+def capture_screen(request_id: str | None = None) -> None:
+    result = _execute_data_request(
+        action="screen.capture",
+        command="hola screenshot",
+        timeout=_timeout("SCREENSHOT_TIMEOUT", 45),
+        request_id=request_id,
+    )
+    _write_data_receipt(result)
+
+
+def _write_data_receipt(result: dict[str, object]) -> None:
+    """Emit a stable JSON envelope consumed by the transport adapter."""
+    sys.stdout.write(json.dumps(result, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -246,11 +554,23 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     send = commands.add_parser("send", help="send one command through the sender agent")
     send.add_argument("words", nargs="+")
+    send.add_argument(
+        "--receipt-action",
+        help="canonical receipt action supplied by the typed CLI policy",
+    )
+    send.add_argument(
+        "--request-id",
+        help="caller-owned 32-character lowercase hexadecimal request id",
+    )
     commands.add_parser("sender", help="run the per-user sender agent")
-    commands.add_parser("read-screen", help="request and return on-screen text")
-    commands.add_parser("screenshot", help="request a screenshot and return its path")
-    commands.add_parser("clipboard", help="request and return the iPhone clipboard")
-    commands.add_parser("alarms", help="request and return enabled alarms")
+    for name, help_text in (
+        ("read-screen", "request and return on-screen text"),
+        ("screenshot", "request a screenshot and return its path"),
+        ("clipboard", "request and return the iPhone clipboard"),
+        ("alarms", "request and return enabled alarms"),
+    ):
+        command = commands.add_parser(name, help=help_text)
+        command.add_argument("--request-id")
     return parser
 
 
@@ -258,17 +578,24 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.command == "send":
-            send_command(" ".join(args.words))
+            command = " ".join(args.words)
+            result = execute_one_way(
+                command,
+                timeout=_timeout("IPHONE_ACTION_TIMEOUT", 30),
+                expected_action=args.receipt_action,
+                request_id=args.request_id,
+            )
+            sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
         elif args.command == "sender":
             run_sender()
         elif args.command == "read-screen":
-            read_screen()
+            read_screen(args.request_id)
         elif args.command == "screenshot":
-            capture_screen()
+            capture_screen(args.request_id)
         elif args.command == "clipboard":
-            read_clipboard()
+            read_clipboard(args.request_id)
         elif args.command == "alarms":
-            read_alarms()
+            read_alarms(args.request_id)
         return 0
     except IPhoneError as error:
         print(f"iphone-assistant-bridge: {error}", file=sys.stderr)

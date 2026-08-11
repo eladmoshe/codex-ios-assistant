@@ -13,6 +13,7 @@ from . import __version__
 from .contact_search import run_contact_search
 from .errors import IPhoneError
 from .message_history import run_message_read
+from .protocol import PROTOCOL_VERSION, REQUEST_ID_PATTERN, new_request_id
 from .resolve import (
     resolve_contact_phone,
     resolve_message_compose_target,
@@ -60,6 +61,14 @@ def _positive_int(value: str) -> int:
     if result <= 0:
         raise argparse.ArgumentTypeError("value must be a positive integer")
     return result
+
+
+def _request_id(value: str) -> str:
+    if REQUEST_ID_PATTERN.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError(
+            "request id must be exactly 32 lowercase hexadecimal characters"
+        )
+    return value
 
 
 def _alarm_time(value: str) -> str:
@@ -112,6 +121,13 @@ def _global_parent() -> argparse.ArgumentParser:
         default=argparse.SUPPRESS,
         metavar="SECONDS",
         help="maximum wait for the iPhone or a helper (default: 30)",
+    )
+    parent.add_argument(
+        "--request-id",
+        type=_request_id,
+        default=argparse.SUPPRESS,
+        metavar="32-HEX-ID",
+        help="correlation id supplied by the caller (32 lowercase hex characters)",
     )
     parent.add_argument(
         "--version",
@@ -422,10 +438,11 @@ def _handle_screen_capture(args: argparse.Namespace) -> Operation:
 def _handle_home(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="home",
-        action="show",
+        action="open",
         kind="hola",
         arguments=("homescreen",),
         summary="Home Screen shown.",
+        receipt_action="home.open",
     )
 
 
@@ -437,6 +454,7 @@ def _handle_flashlight(args: argparse.Namespace) -> Operation:
         kind="hola",
         arguments=("flashlight", args.state),
         summary=f"Flashlight {action}.",
+        receipt_action="flashlight.set",
     )
 
 
@@ -487,7 +505,7 @@ def _handle_alarm_set(args: argparse.Namespace) -> Operation:
 def _handle_alarm_off(args: argparse.Namespace) -> Operation:
     return Operation(
         resource="alarm",
-        action="off",
+        action="disable_at",
         kind="hola",
         arguments=("alarm", "off", args.time),
         summary=f"Alarm-off requested for {_display_alarm_time(args.time)}.",
@@ -499,7 +517,7 @@ def _handle_call(args: argparse.Namespace) -> Operation:
     phone = resolve_contact_phone(args.recipient)
     return Operation(
         resource="call",
-        action="call",
+        action="start",
         kind="hola",
         arguments=("call", phone),
         summary=f"Call placed to {args.recipient}.",
@@ -531,6 +549,7 @@ def _handle_low_power(args: argparse.Namespace) -> Operation:
         kind="hola",
         arguments=("lowpower", args.state),
         summary=f"Low Power Mode {action}.",
+        receipt_action="low_power.set",
     )
 
 
@@ -542,6 +561,7 @@ def _handle_control_center(args: argparse.Namespace) -> Operation:
         kind="hola",
         arguments=("controlcenter", args.state),
         summary=f"Control Center {action}.",
+        receipt_action="control_center.set",
     )
 
 
@@ -1037,20 +1057,62 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _result_dictionary(result: Result) -> dict[str, object]:
-    return {
-        "ok": result.status not in {"failed"},
+def _failure_action(args: argparse.Namespace) -> tuple[str, str, str]:
+    """Derive the policy-owned action identity when a handler fails early."""
+
+    resource = str(getattr(args, "resource", "iphone"))
+    leaf_action = getattr(args, "action", None)
+    if resource == "call":
+        return resource, "start", "call.start"
+    if resource == "low-power":
+        return resource, str(getattr(args, "state", "set")), "low_power.set"
+    if resource == "control-center":
+        return resource, str(getattr(args, "state", "set")), "control_center.set"
+    if resource == "alarm" and leaf_action == "off":
+        return resource, "disable_at", "alarm.disable_at"
+    if resource == "home":
+        return resource, "open", "home.open"
+    if resource == "doctor":
+        return resource, "check", "doctor.check"
+    action = str(leaf_action or "unknown")
+    return resource, action, f"{resource}.{action}"
+
+
+def _result_dictionary(result: Result, *, requested_request_id: str | None = None) -> dict[str, object]:
+    request_id = requested_request_id or result.data.get("request_id")
+    if not isinstance(request_id, str) or REQUEST_ID_PATTERN.fullmatch(request_id) is None:
+        # Mac-local reads (Contacts/Messages) do not use the phone receiver,
+        # but Nami still gets a valid correlation for its own audit record.
+        request_id = new_request_id()
+    payload = {
+        **result.data,
+        "ok": result.status in {"completed", "dry-run"},
+        # This is a public, versioned contract even for Mac-local reads that
+        # do not traverse the phone receiver. Keep it after result.data so a
+        # helper cannot spoof or downgrade the protocol version.
+        "protocol_version": PROTOCOL_VERSION,
         "status": result.status,
         "resource": result.resource,
         "action": result.action,
+        "receipt_action": result.receipt_action or result.resource + "." + result.action,
+        "request_id": request_id,
         "summary": result.summary,
-        **result.data,
     }
+    return payload
 
 
 def _emit(result: Result, args: argparse.Namespace) -> None:
     if getattr(args, "json_output", False):
-        print(json.dumps(_result_dictionary(result), indent=2, sort_keys=True))
+        print(
+            json.dumps(
+                _result_dictionary(
+                    result,
+                    requested_request_id=getattr(args, "request_id", None),
+                ),
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return
 
     if result.resource == "doctor":
@@ -1088,12 +1150,40 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=getattr(args, "dry_run", False),
                 timeout=getattr(args, "timeout", 30),
                 output=getattr(args, "output", None),
+                request_id=getattr(args, "request_id", None),
             )
         _emit(result, args)
-        return 1 if result.status == "failed" else 0
+        # Structured callers (including Nami) must be able to inspect a
+        # truthful failed/timeout receipt rather than losing it to a generic
+        # subprocess-exit error. Human-readable invocations retain a useful
+        # non-zero status for terminal failures.
+        if getattr(args, "json_output", False):
+            return 0
+        return 1 if result.status in {"failed", "timeout"} else 0
     except IPhoneError as error:
         if getattr(args, "json_output", False):
-            print(json.dumps({"ok": False, "error": str(error)}, indent=2), file=sys.stdout)
+            resource, action, receipt_action = _failure_action(args)
+            request_id = getattr(args, "request_id", None) or new_request_id()
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "protocol_version": PROTOCOL_VERSION,
+                        "status": "failed",
+                        "resource": resource,
+                        "action": action,
+                        "receipt_action": receipt_action,
+                        "request_id": request_id,
+                        "error_code": "cli_error",
+                        "error": str(error),
+                        "summary": f"The {receipt_action} operation failed.",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                file=sys.stdout,
+            )
+            return 0
         else:
             print(f"iphone: {error}", file=sys.stderr)
         return 1
