@@ -131,7 +131,7 @@ Personal automations belong to one device, so create this part on the iPhone:
 
 1. Open Shortcuts > Automation and tap the plus sign at the bottom.
 2. Choose New Automation > Message.
-3. Under `When I receive a message where`, set `Sender is` to your own iMessage contact.
+3. Under `When I receive a message where`, set `Sender is` to your own iMessage contact when self-message matching works on your iOS version. Otherwise choose `Any Sender`; every current Shortcut branch independently requires the generated private command secret before it can mutate the phone.
 4. Tap `Add Filter` and set `Message contains` to `hola`.
 5. Choose `Run Immediately` and turn off any confirmation prompt.
 6. Tap `Run Shortcut` and select `iOS Assistant`.
@@ -141,13 +141,17 @@ You must create this automation by hand in the Shortcuts app on the iPhone. It d
 
 Apple describes the relevant setting in [Enable or disable a personal automation](https://support.apple.com/guide/shortcuts/enable-or-disable-a-personal-automation-apd602971e63/ios).
 
-Keep the sender restriction during normal use. Some iOS versions do not classify self-addressed messages under the expected contact. If the automation never fires, remove the sender condition for one test while keeping the `hola` content condition.
+Prefer the sender restriction when it works. Some iOS versions do not classify
+self-addressed messages under the expected contact; in that case `Any Sender`
+is supported with the current secret-gated Shortcut. Keep the `hola` content
+condition, never share the rendered Shortcut, and do not use an older Shortcut
+without the private-prefix branch conditions.
 
 ## 7. Grant iPhone permissions
 
 Run the Shortcut by hand once. iOS may ask for access to the receiver hostname, on-screen content, screenshots, alarms, or the clipboard as it reaches each branch. Choose Allow for features you plan to use.
 
-The installed Shortcut contains the receiver token. Keep the Shortcut and `build/ios-assistant-actions.plist` private.
+The installed Shortcut contains the receiver token and private command secret. Keep the Shortcut and `build/ios-assistant-actions.plist` private.
 
 ## 8. Test each connection
 
@@ -171,7 +175,7 @@ Test iMessage delivery without involving the tunnel:
 iphone home
 ```
 
-Messages should show `hola homescreen`, and the iPhone should open its Home Screen.
+Messages should show a private hexadecimal prefix followed by `hola homescreen`, and the iPhone should open its Home Screen. Do not share or paste that wire message.
 
 Test the response paths:
 

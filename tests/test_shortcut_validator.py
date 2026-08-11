@@ -20,7 +20,7 @@ class ShortcutValidatorTests(unittest.TestCase):
             for action in actions
             if action.get("WFWorkflowActionIdentifier") == "is.workflow.actions.conditional"
             and str(action.get("WFWorkflowActionParameters", {}).get("WFConditionalActionString", "")).startswith(
-                "hola "
+                "__IOS_ASSISTANT_COMMAND_SECRET__ hola "
             )
         ]
         mutate(command_conditions)

@@ -10,29 +10,30 @@ import sys
 
 PUBLIC_PLACEHOLDER = "__IOS_ASSISTANT_PUBLIC_URL__"
 TOKEN_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
+COMMAND_SECRET_PLACEHOLDER = "__IOS_ASSISTANT_COMMAND_SECRET__"
 FORBIDDEN = ("@gmail.com", "/Users/", "trycloudflare.com")
 NORMALIZED_COMMAND_UUID = "7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21"
 EXPECTED_COMMAND_CONDITIONS = {
-    "hola timer start",
-    "hola timer pause",
-    "hola timer resume",
-    "hola timer cancel",
-    "hola flashlight on",
-    "hola flashlight off",
-    "hola call",
-    "hola lowpower on",
-    "hola lowpower off",
-    "hola copytoclipboard",
-    "hola getclipboard",
-    "hola controlcenter open",
-    "hola controlcenter close",
-    "hola openurl",
-    "hola screentext",
-    "hola screenshot",
-    "hola homescreen",
-    "hola alarm get",
-    "hola alarm set",
-    "hola alarm off",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola timer start",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola timer pause",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola timer resume",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola timer cancel",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola flashlight on",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola flashlight off",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola call",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola lowpower on",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola lowpower off",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola copytoclipboard",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola getclipboard",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola controlcenter open",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola controlcenter close",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola openurl",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola screentext",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola screenshot",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola homescreen",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola alarm get",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola alarm set",
+    f"{COMMAND_SECRET_PLACEHOLDER} hola alarm off",
 }
 
 
@@ -76,8 +77,11 @@ def main() -> int:
     strings = [value for value in walk(actions) if isinstance(value, str)]
     public_count = sum(value.count(PUBLIC_PLACEHOLDER) for value in strings)
     token_count = sum(value.count(TOKEN_PLACEHOLDER) for value in strings)
+    command_secret_count = sum(value.count(COMMAND_SECRET_PLACEHOLDER) for value in strings)
     if public_count != 20 or token_count != 20:
         raise SystemExit("expected twenty public URL and twenty receiver-token placeholders")
+    if command_secret_count != 28:
+        raise SystemExit("expected twenty-eight private command-secret placeholders")
     folded = "\n".join(strings).casefold()
     for forbidden in FORBIDDEN:
         if forbidden.casefold() in folded:
@@ -105,7 +109,7 @@ def main() -> int:
             continue
         parameters = action.get("WFWorkflowActionParameters", {})
         command = parameters.get("WFConditionalActionString")
-        if isinstance(command, str) and command.startswith("hola "):
+        if isinstance(command, str) and command.startswith(f"{COMMAND_SECRET_PLACEHOLDER} hola "):
             if not any(
                 isinstance(value, dict)
                 and value.get("Type") == "ActionOutput"

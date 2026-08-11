@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 
 from .config import (
     DATA_DIR,
+    command_secret,
     ensure_socket_parent,
     message_target,
     receiver_token,
@@ -39,6 +40,7 @@ from .protocol import (
 MAX_COMMAND_BYTES = 4096
 MAX_REPLY_BYTES = 16_384
 MAX_REGISTRATION_REPLY_BYTES = 16_384
+WIRE_COMMAND_PATTERN = re.compile(r"^[0-9a-f]{64} hola ")
 
 
 def _read_line(connection: socket.socket, limit: int) -> bytes:
@@ -71,12 +73,12 @@ def _sender_payload(command: str) -> bytes:
 
     if (
         not isinstance(command, str)
-        or not command.startswith("hola ")
+        or WIRE_COMMAND_PATTERN.match(command) is None
         or "\r" in command
         or "\x00" in command
     ):
         raise IPhoneError(
-            "The sender accepts a hola command without carriage returns or NUL bytes."
+            "The sender accepts a secret-prefixed hola command without carriage returns or NUL bytes."
         )
     encoded = json.dumps(
         {"command": command},
@@ -327,6 +329,7 @@ def execute_one_way(
         action=action,
         request_id=request_id,
         capability=capability,
+        command_secret=command_secret(),
     )
     try:
         send_command(wire_command)
@@ -389,12 +392,12 @@ def _handle_sender_connection(connection: socket.socket) -> None:
         command = request.get("command") if isinstance(request, dict) else None
         if (
             not isinstance(command, str)
-            or not command.startswith("hola ")
+            or not command.startswith(f"{command_secret()} hola ")
             or "\r" in command
             or "\x00" in command
         ):
             raise IPhoneError(
-                "The sender accepts a hola command without carriage returns or NUL bytes."
+                "The sender accepts the configured secret-prefixed hola command without carriage returns or NUL bytes."
             )
         _send_imessage(command)
         response = {"ok": True}
@@ -493,6 +496,7 @@ def _execute_data_request(
         action=action,
         request_id=request_id,
         capability=capability,
+        command_secret=command_secret(),
     )
     try:
         send_command(wire_command)

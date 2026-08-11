@@ -5,9 +5,10 @@
 ```text
 __IOS_ASSISTANT_PUBLIC_URL__
 __IOS_ASSISTANT_RECEIVER_TOKEN__
+__IOS_ASSISTANT_COMMAND_SECRET__
 ```
 
-`scripts/render-shortcut.py` reads the private config, substitutes both values, and writes `build/ios-assistant-actions.plist` with mode `0600`.
+`scripts/render-shortcut.py` reads the private config, substitutes all three values, and writes `build/ios-assistant-actions.plist` with mode `0600`.
 
 ## Pasteboard installation
 
@@ -32,7 +33,7 @@ The Shortcut handles:
 - screen text, screenshots, and Home Screen;
 - enabled-alarm listing, alarm creation, and time-based alarm disabling.
 
-Screen text and screenshots use separate commands. `hola screentext <id>` collects visible text and posts JSON to `/text`. `hola screenshot <id>` captures an image and posts it to `/photo`.
+Screen text and screenshots use separate semantic commands. `hola screentext <id>` collects visible text and posts JSON to `/text`. `hola screenshot <id>` captures an image and posts it to `/photo`. On the wire, the CLI prepends the private command secret; all 20 begins-with branches require it before executing a native action.
 
 Every command sent by the hardened CLI also carries `--v=2`, a random request
 ID, a one-time receipt capability, and the canonical action name. Mutating

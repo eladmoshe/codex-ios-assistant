@@ -18,6 +18,15 @@ from iphone_cli.errors import IPhoneError
 
 
 class ConfigTests(unittest.TestCase):
+    def test_command_secret_requires_exact_lowercase_hex(self):
+        with patch.dict(os.environ, {"IPHONE_COMMAND_SECRET": "a" * 64}):
+            self.assertEqual(config.command_secret(), "a" * 64)
+        for invalid in ("a" * 63, "A" * 64, "g" * 64):
+            with self.subTest(invalid=invalid), patch.dict(
+                os.environ, {"IPHONE_COMMAND_SECRET": invalid}
+            ), self.assertRaisesRegex(IPhoneError, "64 lowercase hexadecimal"):
+                config.command_secret()
+
     def test_default_socket_paths_are_private_and_outside_tmp(self):
         for path in (sender_socket(), registration_socket()):
             self.assertFalse(path.is_relative_to(Path("/tmp")))
@@ -123,6 +132,27 @@ class ConfigTests(unittest.TestCase):
                 "IPHONE_MSG_TARGET": "target",
                 "IPHONE_PUBLIC_URL": "https://iphone.example",
                 "IPHONE_RECEIVER_TOKEN": "private-token",
+            }
+            with patch.object(transport, "CONFIG_FILE", config_file), patch.object(
+                transport, "file_values", return_value=values
+            ), patch.object(transport, "sender_socket", return_value=config_root / "sender.sock"), patch.object(
+                transport, "registration_socket", return_value=config_root / "receiver.sock"
+            ), patch.object(transport, "receiver_url", return_value="http://127.0.0.1:1"):
+                report = transport.dependency_report()
+            self.assertFalse(report[0]["available"])
+
+    def test_doctor_rejects_malformed_command_secret(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_root = Path(directory) / "config"
+            config_root.mkdir(mode=0o700)
+            config_file = config_root / "config.env"
+            config_file.write_text("private\n")
+            config_file.chmod(0o600)
+            values = {
+                "IPHONE_MSG_TARGET": "target",
+                "IPHONE_PUBLIC_URL": "https://iphone.example",
+                "IPHONE_RECEIVER_TOKEN": "private-token-with-at-least-32-characters",
+                "IPHONE_COMMAND_SECRET": "A" * 64,
             }
             with patch.object(transport, "CONFIG_FILE", config_file), patch.object(
                 transport, "file_values", return_value=values

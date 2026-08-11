@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from .errors import IPhoneError
 from .config import (
+    COMMAND_SECRET_PATTERN,
     DATA_DIR,
     CONFIG_FILE,
     file_values,
@@ -406,9 +407,17 @@ def dependency_report() -> list[dict[str, object]]:
         "IPHONE_MSG_TARGET",
         "IPHONE_PUBLIC_URL",
         "IPHONE_RECEIVER_TOKEN",
+        "IPHONE_COMMAND_SECRET",
     )
     configuration_ready = configuration_file_ready and all(
         os.environ.get(name, configured.get(name, "")).strip() for name in required_names
+    )
+    configured_command_secret = os.environ.get(
+        "IPHONE_COMMAND_SECRET", configured.get("IPHONE_COMMAND_SECRET", "")
+    ).strip()
+    configuration_ready = (
+        configuration_ready
+        and COMMAND_SECRET_PATTERN.fullmatch(configured_command_secret) is not None
     )
     report.append(
         {

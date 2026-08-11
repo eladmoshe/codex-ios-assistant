@@ -1,4 +1,5 @@
 import json
+import socket
 import unittest
 from unittest.mock import patch
 
@@ -7,6 +8,7 @@ from iphone_cli.errors import IPhoneError
 from iphone_cli.bridge import (
     MAX_COMMAND_BYTES,
     _execute_data_request,
+    _handle_sender_connection,
     _one_way_action,
     _poll_registered,
     _sender_payload,
@@ -20,6 +22,12 @@ from iphone_cli.protocol import (
     parse_receipt_token,
     protocol_command,
 )
+
+COMMAND_SECRET = "a" * 64
+
+
+def wire(command: str) -> str:
+    return f"{COMMAND_SECRET} {command}"
 
 
 class ProtocolTests(unittest.TestCase):
@@ -85,7 +93,9 @@ class ProtocolTests(unittest.TestCase):
             action="timer.start",
             request_id=request_id,
             capability=capability,
+            command_secret=COMMAND_SECRET,
         )
+        self.assertTrue(command.startswith(f"{COMMAND_SECRET} hola "))
         self.assertIn(f"--v={PROTOCOL_VERSION}", command)
         self.assertIn(f"--request-id={request_id}", command)
         self.assertIn(f"--receipt={request_id}.{capability}", command)
@@ -99,32 +109,54 @@ class ProtocolTests(unittest.TestCase):
                 action="url.open",
                 request_id=new_request_id(),
                 capability=new_receipt_capability(),
+                command_secret=COMMAND_SECRET,
             )
 
     def test_sender_payload_escapes_newlines_and_preserves_unicode(self):
-        command = "hola copytoclipboard café ☕\nsecond line"
+        command = wire("hola copytoclipboard café ☕\nsecond line")
         payload = _sender_payload(command)
         self.assertTrue(payload.endswith(b"\n"))
         self.assertLessEqual(len(payload) - 1, MAX_COMMAND_BYTES)
         self.assertEqual(json.loads(payload), {"command": command})
 
+    def test_sender_payload_rejects_public_or_wrong_length_prefixes(self):
+        for command in ("hola homescreen", f"{'b' * 63} hola homescreen"):
+            with self.subTest(command=command), self.assertRaisesRegex(
+                IPhoneError, "secret-prefixed"
+            ):
+                _sender_payload(command)
+
+    def test_sender_service_rejects_a_different_well_formed_secret(self):
+        server, client = socket.socketpair()
+        self.addCleanup(server.close)
+        self.addCleanup(client.close)
+        client.sendall(_sender_payload(f"{'b' * 64} hola homescreen"))
+        with patch("iphone_cli.bridge.command_secret", return_value=COMMAND_SECRET), patch(
+            "iphone_cli.bridge._send_imessage"
+        ) as send:
+            _handle_sender_connection(server)
+        response = json.loads(client.recv(4096).split(b"\n", 1)[0])
+        self.assertFalse(response["ok"])
+        self.assertIn("configured secret-prefixed", response["error"])
+        send.assert_not_called()
+
     def test_sender_payload_accepts_exact_encoded_budget(self):
         # The budget is on the UTF-8 JSON line, not on Python characters.
-        prefix = '{"command":"hola copytoclipboard '
+        prefix = f'{{"command":"{COMMAND_SECRET} hola copytoclipboard '
         suffix = '"}'
         value = "x" * (MAX_COMMAND_BYTES - len(prefix.encode()) - len(suffix.encode()))
-        payload = _sender_payload("hola copytoclipboard " + value)
+        payload = _sender_payload(wire("hola copytoclipboard " + value))
         self.assertEqual(len(payload) - 1, MAX_COMMAND_BYTES)
 
     def test_sender_payload_rejects_one_byte_over_budget(self):
-        prefix = '{"command":"hola copytoclipboard '
+        prefix = f'{{"command":"{COMMAND_SECRET} hola copytoclipboard '
         suffix = '"}'
         value = "x" * (MAX_COMMAND_BYTES - len(prefix.encode()) - len(suffix.encode()) + 1)
         with self.assertRaisesRegex(IPhoneError, "4096-byte"):
-            _sender_payload("hola copytoclipboard " + value)
+            _sender_payload(wire("hola copytoclipboard " + value))
 
     def test_sender_payload_multibyte_boundary_is_measured_in_utf8_bytes(self):
-        command_prefix = "hola copytoclipboard "
+        command_prefix = wire("hola copytoclipboard ")
         candidate = "é" * 4_000
         while True:
             try:
@@ -138,7 +170,10 @@ class ProtocolTests(unittest.TestCase):
             _sender_payload(command_prefix + candidate + "é")
 
     def test_sender_payload_rejects_carriage_return_and_nul(self):
-        for value in ("hola copytoclipboard line\rbreak", "hola copytoclipboard line\x00break"):
+        for value in (
+            wire("hola copytoclipboard line\rbreak"),
+            wire("hola copytoclipboard line\x00break"),
+        ):
             with self.subTest(value=repr(value)), self.assertRaises(IPhoneError):
                 _sender_payload(value)
 
@@ -217,7 +252,9 @@ class ProtocolTests(unittest.TestCase):
 
     def test_execute_one_way_echoes_caller_request_id_through_registration_and_receipt(self):
         request_id = "c" * 32
-        with patch("iphone_cli.bridge._register") as register, patch(
+        with patch("iphone_cli.bridge.command_secret", return_value=COMMAND_SECRET), patch(
+            "iphone_cli.bridge._register"
+        ) as register, patch(
             "iphone_cli.bridge.send_command"
         ) as send, patch(
             "iphone_cli.bridge._poll_registered",
@@ -241,7 +278,9 @@ class ProtocolTests(unittest.TestCase):
 
     def test_sender_response_loss_still_polls_for_phone_receipt(self):
         request_id = "e" * 32
-        with patch("iphone_cli.bridge._register"), patch(
+        with patch("iphone_cli.bridge.command_secret", return_value=COMMAND_SECRET), patch(
+            "iphone_cli.bridge._register"
+        ), patch(
             "iphone_cli.bridge.send_command", side_effect=IPhoneError("sender response lost")
         ), patch(
             "iphone_cli.bridge._poll_registered",
@@ -263,7 +302,9 @@ class ProtocolTests(unittest.TestCase):
 
     def test_data_request_sender_response_loss_still_polls_for_phone_receipt(self):
         request_id = "f" * 32
-        with patch("iphone_cli.bridge._register"), patch(
+        with patch("iphone_cli.bridge.command_secret", return_value=COMMAND_SECRET), patch(
+            "iphone_cli.bridge._register"
+        ), patch(
             "iphone_cli.bridge.send_command", side_effect=IPhoneError("sender response lost")
         ), patch(
             "iphone_cli.bridge._poll_registered",

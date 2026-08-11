@@ -17,7 +17,7 @@ swift build --package-path contacts --configuration release
 
 ## Project rules
 
-- Keep required user config to the three values in `.env.example`.
+- Keep required user config to the four values in `.env.example`.
 - Bind the receiver to loopback and authenticate every data endpoint.
 - Keep phone, Contacts, and Messages content out of logs.
 - Treat Messages delivery as transport progress only. Hardened phone actions

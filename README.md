@@ -27,7 +27,7 @@ flowchart LR
     A["ChatGPT app on iPhone"] -->|Remote session| B["Codex on Mac"]
     B --> C["iphone CLI + skill"]
     C -->|Unix socket| D["Messages sender LaunchAgent"]
-    D -->|private hola command| E["iPhone automation + Shortcut"]
+    D -->|secret-prefixed hola command| E["iPhone automation + Shortcut"]
     E --> F["Native iOS action"]
     E -->|authenticated HTTPS response| G["Cloudflare Tunnel"]
     G --> H["receiver on Mac loopback"]
@@ -64,12 +64,12 @@ brew install cloudflared steipete/tap/imsg
 ./scripts/copy-shortcut
 ```
 
-Configuration has three values: the iMessage address that reaches your iPhone, a stable HTTPS hostname such as `https://iphone.example.com`, and a generated receiver token. The installer stores them in `~/.config/codex-ios-assistant/`, outside the repository.
+Configuration has four values: the iMessage address that reaches your iPhone, a stable HTTPS hostname such as `https://iphone.example.com`, a generated receiver token, and a generated private command secret. The installer stores them in `~/.config/codex-ios-assistant/`, outside the repository. The secret is prepended to every wire command and required by every Shortcut branch before a phone action can run.
 
 `scripts/copy-shortcut` puts 244 native Shortcuts actions on the Mac clipboard. Paste them once into a blank shortcut and name it `iOS Assistant`. After iCloud syncs it to your iPhone, create the automation that listens for commands:
 
 1. Open Shortcuts > Automation, tap the plus sign at the bottom, then choose New Automation > Message.
-2. Under `When I receive a message where`, set `Sender is` to your own iMessage contact.
+2. Under `When I receive a message where`, use your own iMessage contact when self-message matching works; otherwise `Any Sender` is supported by the current secret-gated Shortcut.
 3. Tap `Add Filter` and set `Message contains` to `hola`.
 4. Tap `Run Shortcut` and select `iOS Assistant`.
 

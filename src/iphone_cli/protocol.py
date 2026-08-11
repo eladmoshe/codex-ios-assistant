@@ -68,8 +68,9 @@ def protocol_command(
     action: str,
     request_id: str,
     capability: str,
+    command_secret: str,
 ) -> str:
-    """Append protocol metadata to a validated hola command.
+    """Authenticate a validated semantic command and append protocol metadata.
 
     Newline-delimited JSON on the private sender socket preserves embedded
     newlines in the command.  Carriage returns and NUL bytes are rejected
@@ -83,15 +84,17 @@ def protocol_command(
         or "\x00" in command
     ):
         raise IPhoneError(
-            "The sender accepts a hola command without carriage returns or NUL bytes."
+            "The protocol accepts a hola command without carriage returns or NUL bytes."
         )
     validate_action(action)
     validate_request_id(request_id)
     validate_receipt_capability(capability)
+    if RECEIPT_CAPABILITY_PATTERN.fullmatch(command_secret) is None:
+        raise IPhoneError("command secret must be exactly 64 lowercase hexadecimal characters")
     if any(marker in command for marker in ("--v=", "--request-id=", "--receipt=", "--action=")):
         raise IPhoneError("command arguments contain reserved protocol metadata")
     return (
-        f"{command} --v={PROTOCOL_VERSION} --request-id={request_id} "
+        f"{command_secret} {command} --v={PROTOCOL_VERSION} --request-id={request_id} "
         f"--receipt={receipt_token(request_id, capability)} --action={action}"
     )
 

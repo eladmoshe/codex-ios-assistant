@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import stat
 from pathlib import Path
@@ -26,6 +27,7 @@ LOG_DIR = Path(
 PRIVATE_SOCKET_DIR_MODE = 0o700
 PRIVATE_SOCKET_MODE = 0o600
 PRIVATE_CONFIG_FILE_MODE = 0o600
+COMMAND_SECRET_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 def file_values() -> dict[str, str]:
@@ -120,6 +122,13 @@ def receiver_token() -> str:
     if len(token) < 32:
         raise IPhoneError("IPHONE_RECEIVER_TOKEN must contain at least 32 characters.")
     return token
+
+
+def command_secret() -> str:
+    secret = value("IPHONE_COMMAND_SECRET", required=True)
+    if COMMAND_SECRET_PATTERN.fullmatch(secret) is None:
+        raise IPhoneError("IPHONE_COMMAND_SECRET must be exactly 64 lowercase hexadecimal characters.")
+    return secret
 
 
 def public_url() -> str:
