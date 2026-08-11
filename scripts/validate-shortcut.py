@@ -41,6 +41,20 @@ def main() -> int:
             raise SystemExit(f"private-looking value remains in template: {forbidden}")
     if "hola say" in folded or "is.workflow.actions.speaktext" in folded:
         raise SystemExit("unsupported legacy speech branch remains in the Shortcut template")
+    identifiers = {
+        action.get("WFWorkflowActionIdentifier")
+        for action in actions
+        if isinstance(action, dict)
+    }
+    unsupported_screen_actions = {
+        "is.workflow.actions.getonscreencontext",
+        "is.workflow.actions.getselectedtext",
+    }
+    present_unsupported = sorted(unsupported_screen_actions.intersection(identifiers))
+    if present_unsupported:
+        raise SystemExit(f"unsupported iPhone screen actions present: {', '.join(present_unsupported)}")
+    if "is.workflow.actions.getonscreencontent" not in identifiers:
+        raise SystemExit("iPhone-compatible on-screen content action is missing")
     literal_web_origins = [
         value
         for value in strings
