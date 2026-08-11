@@ -39,6 +39,9 @@ fi
 
 if [[ ! -f "$HOME/.config/codex-ios-assistant/config.env" ]]; then
   "$repo_dir/scripts/configure"
+else
+  # Preserve existing values and atomically backfill newly required secrets.
+  "$repo_dir/scripts/configure" --non-interactive
 fi
 
 print "Installed iphone CLI: $local_bin/iphone"

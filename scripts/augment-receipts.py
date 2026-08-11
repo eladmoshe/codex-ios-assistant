@@ -19,6 +19,8 @@ PUBLIC = "__IOS_ASSISTANT_PUBLIC_URL__"
 TOKEN = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
 COMMAND_SECRET = "__IOS_ASSISTANT_COMMAND_SECRET__"
 NORMALIZED_COMMAND_UUID = "7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21"
+TIMER_DURATION_UUID = "E9A5A5F0-0001-4CCC-8CCC-000000000001"
+TIMER_DURATION_PATTERN = r"(?i)[0-9]+(?=\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=timer\.start\s*$)"
 NAMESPACE = uuid.UUID("fae2f1d4-ae8e-55d4-bc9a-e4b0e6b1f5a8")
 
 
@@ -120,6 +122,13 @@ def harden_command_input(actions: list[dict[str, object]]) -> bool:
             parameters["WFReplaceTextFind"] = pattern.replace(
                 r"^\s*hola", rf"^\s*{COMMAND_SECRET}\s+hola"
             )
+            changed = True
+        if (
+            item.get("WFWorkflowActionIdentifier") == "is.workflow.actions.text.match"
+            and parameters.get("UUID") == TIMER_DURATION_UUID
+            and parameters.get("WFMatchTextPattern") != TIMER_DURATION_PATTERN
+        ):
+            parameters["WFMatchTextPattern"] = TIMER_DURATION_PATTERN
             changed = True
     return changed
 

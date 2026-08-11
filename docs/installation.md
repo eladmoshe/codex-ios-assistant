@@ -228,6 +228,10 @@ git pull --ff-only
 ./scripts/install-services
 ```
 
+`scripts/install` non-interactively preserves an existing private target, URL,
+and receiver token while generating any newly required command secret. To run
+the migration directly, use `./scripts/configure --non-interactive`.
+
 If `shortcut/actions.template.plist` changed, run `scripts/copy-shortcut` and paste the actions into a new blank Shortcut. Point the automation at the new copy after it passes a test.
 
 Stop the background jobs with:

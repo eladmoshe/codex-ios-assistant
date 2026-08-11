@@ -51,6 +51,14 @@ def main() -> int:
         raise SystemExit("Run ./scripts/install first.")
     if not CONFIG_FILE.is_file():
         raise SystemExit("Run ./scripts/configure first.")
+    validation = subprocess.run(
+        [str(PYTHON), "-c", "from iphone_cli.config import command_secret; command_secret()"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if validation.returncode != 0:
+        raise SystemExit("Private config is incomplete; run ./scripts/configure --non-interactive first.")
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.chmod(0o700)
     AGENT_DIR.mkdir(parents=True, exist_ok=True)

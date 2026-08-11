@@ -13,6 +13,7 @@ TOKEN_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
 COMMAND_SECRET_PLACEHOLDER = "__IOS_ASSISTANT_COMMAND_SECRET__"
 FORBIDDEN = ("@gmail.com", "/Users/", "trycloudflare.com")
 NORMALIZED_COMMAND_UUID = "7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21"
+TIMER_DURATION_PATTERN = r"(?i)[0-9]+(?=\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=timer\.start\s*$)"
 EXPECTED_COMMAND_CONDITIONS = {
     f"{COMMAND_SECRET_PLACEHOLDER} hola timer start",
     f"{COMMAND_SECRET_PLACEHOLDER} hola timer pause",
@@ -82,6 +83,15 @@ def main() -> int:
         raise SystemExit("expected twenty public URL and twenty receiver-token placeholders")
     if command_secret_count != 28:
         raise SystemExit("expected twenty-eight private command-secret placeholders")
+    timer_duration_patterns = [
+        action.get("WFWorkflowActionParameters", {}).get("WFMatchTextPattern")
+        for action in actions
+        if action.get("WFWorkflowActionIdentifier") == "is.workflow.actions.text.match"
+        and action.get("WFWorkflowActionParameters", {}).get("UUID")
+        == "E9A5A5F0-0001-4CCC-8CCC-000000000001"
+    ]
+    if timer_duration_patterns != [TIMER_DURATION_PATTERN]:
+        raise SystemExit("timer duration parser must bind digits to the timer.start trailer")
     folded = "\n".join(strings).casefold()
     for forbidden in FORBIDDEN:
         if forbidden.casefold() in folded:

@@ -1,9 +1,12 @@
 import json
+from pathlib import Path
 import socket
+import tempfile
 import unittest
 from unittest.mock import patch
 
 import iphone_cli.transport as transport
+import iphone_cli.bridge as bridge
 from iphone_cli.errors import IPhoneError
 from iphone_cli.bridge import (
     MAX_COMMAND_BYTES,
@@ -12,6 +15,7 @@ from iphone_cli.bridge import (
     _one_way_action,
     _poll_registered,
     _sender_payload,
+    _send_imessage,
     build_parser,
     execute_one_way,
 )
@@ -139,6 +143,26 @@ class ProtocolTests(unittest.TestCase):
         self.assertFalse(response["ok"])
         self.assertIn("configured secret-prefixed", response["error"])
         send.assert_not_called()
+
+    def test_messages_helper_keeps_command_secret_out_of_process_arguments(self):
+        command = wire("hola homescreen --v=2")
+        observed_path = None
+
+        def inspect_run(arguments, **kwargs):
+            nonlocal observed_path
+            self.assertNotIn(command, arguments)
+            observed_path = arguments[-2]
+            self.assertEqual(Path(observed_path).read_text(encoding="utf-8"), command)
+            return transport.subprocess.CompletedProcess(arguments, 0, "", "")
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            bridge, "CONFIG_DIR", Path(directory)
+        ), patch("iphone_cli.bridge.message_target", return_value="private-target"), patch(
+            "iphone_cli.bridge.subprocess.run", side_effect=inspect_run
+        ):
+            _send_imessage(command)
+        self.assertIsNotNone(observed_path)
+        self.assertFalse(Path(observed_path).exists())
 
     def test_sender_payload_accepts_exact_encoded_budget(self):
         # The budget is on the UTF-8 JSON line, not on Python characters.

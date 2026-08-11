@@ -9,6 +9,7 @@ from pathlib import Path
 import secrets
 import shlex
 import re
+import stat
 from urllib.parse import urlsplit
 
 
@@ -24,8 +25,22 @@ COMMAND_SECRET_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 def existing_values() -> dict[str, str]:
     values: dict[str, str] = {}
-    if not CONFIG_FILE.is_file():
+    if not CONFIG_FILE.exists():
         return values
+    file_status = CONFIG_FILE.lstat()
+    parent_status = CONFIG_DIR.lstat()
+    if (
+        not stat.S_ISREG(file_status.st_mode)
+        or file_status.st_uid != os.getuid()
+        or stat.S_IMODE(file_status.st_mode) != 0o600
+        or not stat.S_ISDIR(parent_status.st_mode)
+        or parent_status.st_uid != os.getuid()
+        or stat.S_IMODE(parent_status.st_mode) != 0o700
+    ):
+        raise SystemExit(
+            f"Refusing to read insecure configuration at {CONFIG_FILE}; "
+            "require an owned regular mode-0600 file under an owned mode-0700 directory."
+        )
     for raw_line in CONFIG_FILE.read_text().splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -50,6 +65,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Configure codex-ios-assistant")
     parser.add_argument("--target", help="your own iMessage email address or phone number")
     parser.add_argument("--url", help="stable HTTPS receiver origin")
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="preserve existing target and URL while backfilling generated secrets",
+    )
     parser.add_argument("--force-token", action="store_true", help="rotate the receiver token")
     parser.add_argument(
         "--force-command-secret",
@@ -59,13 +79,17 @@ def main() -> int:
     args = parser.parse_args()
 
     current = existing_values()
-    target = args.target or prompt(
-        "iMessage address that reaches this iPhone", current.get("IPHONE_MSG_TARGET", "")
-    )
-    public_url = args.url or prompt(
-        "Cloudflare HTTPS origin (for example https://iphone.example.com)",
-        current.get("IPHONE_PUBLIC_URL", ""),
-    )
+    if args.non_interactive:
+        target = args.target or current.get("IPHONE_MSG_TARGET", "")
+        public_url = args.url or current.get("IPHONE_PUBLIC_URL", "")
+    else:
+        target = args.target or prompt(
+            "iMessage address that reaches this iPhone", current.get("IPHONE_MSG_TARGET", "")
+        )
+        public_url = args.url or prompt(
+            "Cloudflare HTTPS origin (for example https://iphone.example.com)",
+            current.get("IPHONE_PUBLIC_URL", ""),
+        )
     public_url = public_url.rstrip("/")
     parsed_url = urlsplit(public_url)
     if parsed_url.scheme != "https" or not parsed_url.hostname or parsed_url.path not in {"", "/"}:

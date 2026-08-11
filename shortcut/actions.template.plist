@@ -74,7 +74,7 @@
 			<key>WFMatchTextCaseSensitive</key>
 			<false/>
 			<key>WFMatchTextPattern</key>
-			<string>[0-9]+</string>
+			<string>(?i)[0-9]+(?=\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=timer\.start\s*$)</string>
 			<key>text</key>
 			<dict>
 				<key>Value</key>
