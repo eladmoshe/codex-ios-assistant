@@ -91,6 +91,11 @@ HARDENED_ACTION_BY_PATH = {
     "/clipboard": "clipboard.get",
     "/get-alarm": "alarm.list",
 }
+# Data-producing actions have a correlated response endpoint.  A generic
+# receipt for one of these actions must never consume the pending capability;
+# otherwise a later response carrying the actual data would be rejected as a
+# replay.  Derive this set from the route registry so aliases cannot drift.
+DEDICATED_DATA_ACTIONS = frozenset(HARDENED_ACTION_BY_PATH.values())
 
 
 def _now() -> float:
@@ -875,6 +880,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             not isinstance(error_code, str) or ERROR_CODE_PATTERN.fullmatch(error_code) is None
         ):
             return self._reply(400, "invalid receipt error code\n")
+        if action in DEDICATED_DATA_ACTIONS:
+            return self._reply(409, "data action requires its dedicated endpoint\n")
         try:
             accept_receipt(
                 request_id,

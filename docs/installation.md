@@ -232,7 +232,12 @@ git pull --ff-only
 and receiver token while generating any newly required command secret. To run
 the migration directly, use `./scripts/configure --non-interactive`.
 
-If `shortcut/actions.template.plist` changed, run `scripts/copy-shortcut` and paste the actions into a new blank Shortcut. Point the automation at the new copy after it passes a test.
+If `shortcut/actions.template.plist` changed, run `scripts/copy-shortcut` and
+replace all actions in the existing stable `iOS Assistant` Shortcut in place:
+open it, select and delete its current actions, paste the full action list, and
+save. Keep the existing Shortcut identity so the iPhone Message automation
+continues to invoke it; do not create a new versioned copy for a template
+update. After iCloud syncs, verify the automation still targets `iOS Assistant`.
 
 Stop the background jobs with:
 

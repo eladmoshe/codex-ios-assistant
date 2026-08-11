@@ -1,5 +1,6 @@
 import plistlib
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -9,6 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "shortcut" / "actions.template.plist"
 VALIDATOR = ROOT / "scripts" / "validate-shortcut.py"
+AUGMENT_RECEIPTS = ROOT / "scripts" / "augment-receipts.py"
 
 
 class ShortcutValidatorTests(unittest.TestCase):
@@ -62,6 +64,58 @@ class ShortcutValidatorTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("raw Message automation input", result.stderr)
+
+    def test_rejects_generic_message_input_without_content_extraction(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        actions[0]["WFWorkflowActionParameters"]["WFInput"]["Value"].pop(
+            "Aggrandizements"
+        )
+        with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
+            plistlib.dump(actions, mutated)
+            mutated.flush()
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), mutated.name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("extract the Message Content property", result.stderr)
+
+    def test_augment_repairs_message_content_input_and_rewrites_later_consumers(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        module = runpy.run_path(str(AUGMENT_RECEIPTS), run_name="augment_receipts_test")
+        actions[0]["WFWorkflowActionParameters"]["WFInput"]["Value"].pop(
+            "Aggrandizements"
+        )
+        actions[1]["WFWorkflowActionParameters"]["WFInput"] = {
+            "Value": {"Type": "ExtensionInput"},
+            "WFSerializationType": "WFTextTokenAttachment",
+        }
+
+        changed = module["harden_command_input"](actions)
+
+        self.assertTrue(changed)
+        first_value = actions[0]["WFWorkflowActionParameters"]["WFInput"]["Value"]
+        self.assertEqual(
+            first_value["Aggrandizements"],
+            [{"PropertyName": "Content", "Type": "WFPropertyVariableAggrandizement"}],
+        )
+
+        def has_extension_input(value):
+            if isinstance(value, dict):
+                return value.get("Type") == "ExtensionInput" or any(
+                    has_extension_input(child) for child in value.values()
+                )
+            if isinstance(value, list):
+                return any(has_extension_input(child) for child in value)
+            return False
+
+        self.assertFalse(
+            any(has_extension_input(action) for action in actions[1:])
+        )
 
     def test_rejects_timer_parser_that_can_read_secret_digits(self):
         with TEMPLATE.open("rb") as source:

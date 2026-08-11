@@ -34,7 +34,7 @@ Read [Shortcut maintenance](shortcut.md) before editing the plist. Output UUIDs 
 ## Release check
 
 1. Run `make test` and build Contacts.
-2. Install the rendered Shortcut as a new copy.
+2. Replace all actions in the existing stable `iOS Assistant` Shortcut in place; keep the Message automation target unchanged.
 3. Test one-way commands, the registration socket, receipt replay rejection,
    and all four hardened response endpoints.
 4. Test unlabeled alarms and multiple enabled alarms at one time.

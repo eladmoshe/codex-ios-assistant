@@ -13,6 +13,10 @@ TOKEN_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
 COMMAND_SECRET_PLACEHOLDER = "__IOS_ASSISTANT_COMMAND_SECRET__"
 FORBIDDEN = ("@gmail.com", "/Users/", "trycloudflare.com")
 NORMALIZED_COMMAND_UUID = "7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21"
+MESSAGE_CONTENT_AGGRANDIZEMENT = {
+    "PropertyName": "Content",
+    "Type": "WFPropertyVariableAggrandizement",
+}
 TIMER_DURATION_PATTERN = r"(?i)[0-9]+(?=\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=timer\.start\s*$)"
 EXPECTED_COMMAND_CONDITIONS = {
     f"{COMMAND_SECRET_PLACEHOLDER} hola timer start",
@@ -56,12 +60,16 @@ def main() -> int:
         raise SystemExit(f"expected 244 Shortcut actions, found {len(actions) if isinstance(actions, list) else 'non-list'}")
     normalization = actions[0]
     normalization_parameters = normalization.get("WFWorkflowActionParameters", {})
+    normalization_input = normalization_parameters.get("WFInput", {})
+    normalization_value = normalization_input.get("Value", {})
     if (
         normalization.get("WFWorkflowActionIdentifier") != "is.workflow.actions.detect.text"
         or normalization_parameters.get("UUID") != NORMALIZED_COMMAND_UUID
-        or normalization_parameters.get("WFInput", {}).get("Value", {}).get("Type") != "ExtensionInput"
+        or normalization_input.get("WFSerializationType") != "WFTextTokenAttachment"
+        or normalization_value.get("Type") != "ExtensionInput"
+        or normalization_value.get("Aggrandizements") != [MESSAGE_CONTENT_AGGRANDIZEMENT]
     ):
-        raise SystemExit("first action must normalize the Message automation input to text")
+        raise SystemExit("first action must extract the Message Content property before text coercion")
     leaked_extension_inputs = [
         index
         for index, action in enumerate(actions[1:], start=1)

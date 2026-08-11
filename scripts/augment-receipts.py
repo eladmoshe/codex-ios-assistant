@@ -19,6 +19,10 @@ PUBLIC = "__IOS_ASSISTANT_PUBLIC_URL__"
 TOKEN = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
 COMMAND_SECRET = "__IOS_ASSISTANT_COMMAND_SECRET__"
 NORMALIZED_COMMAND_UUID = "7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21"
+MESSAGE_CONTENT_AGGRANDIZEMENT = {
+    "PropertyName": "Content",
+    "Type": "WFPropertyVariableAggrandizement",
+}
 TIMER_DURATION_UUID = "E9A5A5F0-0001-4CCC-8CCC-000000000001"
 TIMER_DURATION_PATTERN = r"(?i)[0-9]+(?=\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=timer\.start\s*$)"
 NAMESPACE = uuid.UUID("fae2f1d4-ae8e-55d4-bc9a-e4b0e6b1f5a8")
@@ -69,8 +73,19 @@ def extension_input() -> dict[str, object]:
     }
 
 
+def message_content_input() -> dict[str, object]:
+    """Extract the Message automation's Content property before text coercion."""
+    return {
+        "Value": {
+            "Aggrandizements": [MESSAGE_CONTENT_AGGRANDIZEMENT.copy()],
+            "Type": "ExtensionInput",
+        },
+        "WFSerializationType": "WFTextTokenAttachment",
+    }
+
+
 def harden_command_input(actions: list[dict[str, object]]) -> bool:
-    """Normalize Message input and require the private prefix before any branch."""
+    """Extract Message Content and require the private prefix before any branch."""
     changed = False
     if not (
         actions
@@ -84,11 +99,20 @@ def harden_command_input(actions: list[dict[str, object]]) -> bool:
                 "WFWorkflowActionIdentifier": "is.workflow.actions.detect.text",
                 "WFWorkflowActionParameters": {
                     "UUID": NORMALIZED_COMMAND_UUID,
-                    "WFInput": extension_input(),
+                    "WFInput": message_content_input(),
                 },
             },
         )
         changed = True
+
+    if actions and actions[0].get("WFWorkflowActionIdentifier") == "is.workflow.actions.detect.text":
+        parameters = actions[0].setdefault("WFWorkflowActionParameters", {})
+        if parameters.get("UUID") == NORMALIZED_COMMAND_UUID:
+            current_input = parameters.get("WFInput")
+            expected_input = message_content_input()
+            if current_input != expected_input:
+                parameters["WFInput"] = expected_input
+                changed = True
 
     def visit(value: object, *, keep_extension_input: bool = False) -> None:
         nonlocal changed

@@ -16,8 +16,10 @@ The Mac sends commands through iMessage. The iPhone returns data through HTTPS.
 
 The sender accepts one newline-delimited JSON request whose command begins
 with the configured 64-lowercase-hex private secret and `hola `. The Shortcut
-normalizes the Message input to text and requires that exact prefix in every
-branch before any native action. The hardened CLI appends
+extracts the newly received Message's `Content` property in its first native
+action, then coerces that value to text. Every later branch consumes that
+action output, and requires the exact private prefix before any native action.
+The hardened CLI appends
 machine-owned fields to every phone command:
 
 ```text
