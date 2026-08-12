@@ -131,6 +131,14 @@ def main() -> int:
     if bootstrap_indexes != [1, 245, 257]:
         raise SystemExit("permission bootstrap must wrap authenticated branches and run only on no input")
     bootstrap_open = actions[1].get("WFWorkflowActionParameters", {})
+    bootstrap_else = actions[245].get("WFWorkflowActionParameters", {})
+    bootstrap_close = actions[257].get("WFWorkflowActionParameters", {})
+    if (
+        bootstrap_open.get("WFControlFlowMode") != 0
+        or bootstrap_else.get("WFControlFlowMode") != 1
+        or bootstrap_close.get("WFControlFlowMode") != 2
+    ):
+        raise SystemExit("permission bootstrap control-flow modes must be If, Otherwise, End If")
     if bootstrap_open.get("WFCondition") != 100 or bootstrap_open.get("WFInput") != {
         "Type": "Variable",
         "Variable": {
@@ -159,9 +167,11 @@ def main() -> int:
     if [action.get("WFWorkflowActionIdentifier") for action in actions[246:257]] != expected_bootstrap_identifiers:
         raise SystemExit("permission bootstrap action sequence changed")
     bootstrap_download = actions[255].get("WFWorkflowActionParameters", {})
-    if bootstrap_download.get("WFURL") != f"{PUBLIC_PLACEHOLDER}/health" or any(
-        key in bootstrap_download for key in ("WFHTTPBodyType", "WFHTTPHeaders", "WFJSONValues")
-    ):
+    if set(bootstrap_download) != {"ShowHeaders", "UUID", "WFURL"} or bootstrap_download != {
+        "ShowHeaders": False,
+        "UUID": "1486019F-F7C0-59C6-B80E-745C42E2DA24",
+        "WFURL": f"{PUBLIC_PLACEHOLDER}/health",
+    }:
         raise SystemExit("permission bootstrap may only make a body-free receiver health request")
     bootstrap_alarm = actions[253].get("WFWorkflowActionParameters", {})
     alarm_filters = (

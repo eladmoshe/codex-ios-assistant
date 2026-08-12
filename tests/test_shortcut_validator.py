@@ -157,6 +157,38 @@ class ShortcutValidatorTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("body-free receiver health request", result.stderr)
 
+    def test_rejects_permission_bootstrap_non_get_method(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        actions[255]["WFWorkflowActionParameters"]["WFHTTPMethod"] = "DELETE"
+        with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
+            plistlib.dump(actions, mutated)
+            mutated.flush()
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), mutated.name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("body-free receiver health request", result.stderr)
+
+    def test_rejects_permission_bootstrap_alternate_body_field(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        actions[255]["WFWorkflowActionParameters"]["WFFormValues"] = {"private": "data"}
+        with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
+            plistlib.dump(actions, mutated)
+            mutated.flush()
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), mutated.name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("body-free receiver health request", result.stderr)
+
     def test_rejects_permission_bootstrap_outside_no_input_else(self):
         with TEMPLATE.open("rb") as source:
             actions = plistlib.load(source)
@@ -171,6 +203,7 @@ class ShortcutValidatorTests(unittest.TestCase):
                 check=False,
             )
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn("control-flow modes", result.stderr)
 
     def test_rejects_permission_bootstrap_alarm_scope_expansion(self):
         with TEMPLATE.open("rb") as source:
