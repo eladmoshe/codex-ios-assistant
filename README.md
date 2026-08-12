@@ -66,7 +66,7 @@ brew install cloudflared steipete/tap/imsg
 
 Configuration has four values: the iMessage address that reaches your iPhone, a stable HTTPS hostname such as `https://iphone.example.com`, a generated receiver token, and a generated private command secret. The installer stores them in `~/.config/codex-ios-assistant/`, outside the repository. The secret is prepended to every wire command and required by every Shortcut branch before a phone action can run.
 
-`scripts/copy-shortcut` puts 244 native Shortcuts actions on the Mac clipboard. Paste them once into a blank shortcut and name it `iOS Assistant`. After iCloud syncs it to your iPhone, create the automation that listens for commands:
+`scripts/copy-shortcut` puts 258 native Shortcuts actions on the Mac clipboard. Paste them once into a blank shortcut and name it `iOS Assistant`. After iCloud syncs it to your iPhone, create the automation that listens for commands:
 
 1. Open Shortcuts > Automation, tap the plus sign at the bottom, then choose New Automation > Message.
 2. Under `When I receive a message where`, use your own iMessage contact when self-message matching works; otherwise `Any Sender` is supported by the current secret-gated Shortcut.
@@ -95,7 +95,7 @@ reaches the Mac.
 | Path | Contents |
 | --- | --- |
 | `src/iphone_cli/` | CLI, Messages bridge, receiver, and URL builders |
-| `shortcut/actions.template.plist` | Sanitized 244-action Shortcut template |
+| `shortcut/actions.template.plist` | Sanitized 258-action Shortcut template |
 | `scripts/` | Install, configuration, tunnel, LaunchAgent, and clipboard tools |
 | `skills/iphone-control/` | Codex skill installed under `~/.agents/skills` |
 | `contacts/` | Swift Contacts search helper |

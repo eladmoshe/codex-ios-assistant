@@ -13,6 +13,7 @@ TOKEN_PLACEHOLDER = "__IOS_ASSISTANT_RECEIVER_TOKEN__"
 COMMAND_SECRET_PLACEHOLDER = "__IOS_ASSISTANT_COMMAND_SECRET__"
 FORBIDDEN = ("@gmail.com", "/Users/", "trycloudflare.com")
 NORMALIZED_COMMAND_UUID = "7A4E12C1-5E7D-4EFA-9C15-0A2F663E1C21"
+PERMISSION_BOOTSTRAP_GROUP = "DBA7C2B0-2414-5D53-99CA-4D283D77DE51"
 MESSAGE_CONTENT_AGGRANDIZEMENT = {
     "PropertyName": "Content",
     "Type": "WFPropertyVariableAggrandizement",
@@ -56,8 +57,8 @@ def main() -> int:
     path = Path(sys.argv[1]) if len(sys.argv) == 2 else Path("shortcut/actions.template.plist")
     with path.open("rb") as source:
         actions = plistlib.load(source)
-    if not isinstance(actions, list) or len(actions) != 244:
-        raise SystemExit(f"expected 244 Shortcut actions, found {len(actions) if isinstance(actions, list) else 'non-list'}")
+    if not isinstance(actions, list) or len(actions) != 258:
+        raise SystemExit(f"expected 258 Shortcut actions, found {len(actions) if isinstance(actions, list) else 'non-list'}")
     normalization = actions[0]
     normalization_parameters = normalization.get("WFWorkflowActionParameters", {})
     normalization_input = normalization_parameters.get("WFInput", {})
@@ -87,8 +88,8 @@ def main() -> int:
     public_count = sum(value.count(PUBLIC_PLACEHOLDER) for value in strings)
     token_count = sum(value.count(TOKEN_PLACEHOLDER) for value in strings)
     command_secret_count = sum(value.count(COMMAND_SECRET_PLACEHOLDER) for value in strings)
-    if public_count != 20 or token_count != 20:
-        raise SystemExit("expected twenty public URL and twenty receiver-token placeholders")
+    if public_count != 21 or token_count != 20:
+        raise SystemExit("expected twenty-one public URL and twenty receiver-token placeholders")
     if command_secret_count != 28:
         raise SystemExit("expected twenty-eight private command-secret placeholders")
     timer_duration_patterns = [
@@ -120,6 +121,87 @@ def main() -> int:
         raise SystemExit(f"unsupported iPhone screen actions present: {', '.join(present_unsupported)}")
     if "is.workflow.actions.getonscreencontent" not in identifiers:
         raise SystemExit("iPhone-compatible on-screen content action is missing")
+
+    bootstrap_indexes = [
+        index
+        for index, action in enumerate(actions)
+        if action.get("WFWorkflowActionParameters", {}).get("GroupingIdentifier")
+        == PERMISSION_BOOTSTRAP_GROUP
+    ]
+    if bootstrap_indexes != [1, 245, 257]:
+        raise SystemExit("permission bootstrap must wrap authenticated branches and run only on no input")
+    bootstrap_open = actions[1].get("WFWorkflowActionParameters", {})
+    bootstrap_else = actions[245].get("WFWorkflowActionParameters", {})
+    bootstrap_close = actions[257].get("WFWorkflowActionParameters", {})
+    if any(
+        actions[index].get("WFWorkflowActionIdentifier") != "is.workflow.actions.conditional"
+        for index in (1, 245, 257)
+    ):
+        raise SystemExit("permission bootstrap markers must remain conditional actions")
+    if (
+        bootstrap_open.get("WFControlFlowMode") != 0
+        or bootstrap_else.get("WFControlFlowMode") != 1
+        or bootstrap_close.get("WFControlFlowMode") != 2
+    ):
+        raise SystemExit("permission bootstrap control-flow modes must be If, Otherwise, End If")
+    if bootstrap_else != {
+        "GroupingIdentifier": PERMISSION_BOOTSTRAP_GROUP,
+        "WFControlFlowMode": 1,
+    } or bootstrap_close != {
+        "GroupingIdentifier": PERMISSION_BOOTSTRAP_GROUP,
+        "UUID": "6A4BC2B2-9F13-5CBC-843D-2318A9F2FA38",
+        "WFControlFlowMode": 2,
+    }:
+        raise SystemExit("permission bootstrap Otherwise and End If markers changed")
+    if bootstrap_open.get("WFCondition") != 100 or bootstrap_open.get("WFInput") != {
+        "Type": "Variable",
+        "Variable": {
+            "Value": {
+                "OutputName": "Text",
+                "OutputUUID": NORMALIZED_COMMAND_UUID,
+                "Type": "ActionOutput",
+            },
+            "WFSerializationType": "WFTextTokenAttachment",
+        },
+    }:
+        raise SystemExit("permission bootstrap must test normalized input for any value")
+    expected_bootstrap_identifiers = [
+        "is.workflow.actions.getclipboard",
+        "is.workflow.actions.nothing",
+        "is.workflow.actions.getcurrentapp",
+        "is.workflow.actions.getonscreencontent",
+        "is.workflow.actions.nothing",
+        "is.workflow.actions.takescreenshot",
+        "is.workflow.actions.nothing",
+        "com.apple.mobiletimer-framework.MobileTimerIntents.MTGetAlarmsIntent",
+        "is.workflow.actions.nothing",
+        "is.workflow.actions.downloadurl",
+        "is.workflow.actions.nothing",
+    ]
+    if [action.get("WFWorkflowActionIdentifier") for action in actions[246:257]] != expected_bootstrap_identifiers:
+        raise SystemExit("permission bootstrap action sequence changed")
+    bootstrap_download = actions[255].get("WFWorkflowActionParameters", {})
+    if set(bootstrap_download) != {"ShowHeaders", "UUID", "WFURL"} or bootstrap_download != {
+        "ShowHeaders": False,
+        "UUID": "1486019F-F7C0-59C6-B80E-745C42E2DA24",
+        "WFURL": f"{PUBLIC_PLACEHOLDER}/health",
+    }:
+        raise SystemExit("permission bootstrap may only make a body-free receiver health request")
+    bootstrap_alarm = actions[253].get("WFWorkflowActionParameters", {})
+    alarm_filters = (
+        bootstrap_alarm.get("WFContentItemFilter", {})
+        .get("Value", {})
+        .get("WFActionParameterFilterTemplates", [])
+    )
+    if alarm_filters != [
+        {
+            "Operator": 4,
+            "Property": "enabled",
+            "Removable": True,
+            "Values": {"Bool": True, "Unit": 4},
+        }
+    ]:
+        raise SystemExit("permission bootstrap alarm read must be enabled-only")
 
     command_conditions = []
     for index, action in enumerate(actions):
