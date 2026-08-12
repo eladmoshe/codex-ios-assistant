@@ -140,6 +140,55 @@ class ShortcutValidatorTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("timer duration parser", result.stderr)
 
+    def test_rejects_permission_bootstrap_that_uploads_data(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        bootstrap_download = actions[255]["WFWorkflowActionParameters"]
+        bootstrap_download["WFJSONValues"] = {"unexpected": "private data"}
+        with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
+            plistlib.dump(actions, mutated)
+            mutated.flush()
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), mutated.name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("body-free receiver health request", result.stderr)
+
+    def test_rejects_permission_bootstrap_outside_no_input_else(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        actions[245]["WFWorkflowActionParameters"]["WFControlFlowMode"] = 2
+        with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
+            plistlib.dump(actions, mutated)
+            mutated.flush()
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), mutated.name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_rejects_permission_bootstrap_alarm_scope_expansion(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        alarm_filter = actions[253]["WFWorkflowActionParameters"]["WFContentItemFilter"]
+        alarm_filter["Value"]["WFActionParameterFilterTemplates"] = []
+        with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
+            plistlib.dump(actions, mutated)
+            mutated.flush()
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), mutated.name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("alarm read must be enabled-only", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

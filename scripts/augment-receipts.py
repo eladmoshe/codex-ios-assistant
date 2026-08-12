@@ -11,6 +11,7 @@ from __future__ import annotations
 import plistlib
 from pathlib import Path
 import uuid
+from copy import deepcopy
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,7 @@ MESSAGE_CONTENT_AGGRANDIZEMENT = {
 TIMER_DURATION_UUID = "E9A5A5F0-0001-4CCC-8CCC-000000000001"
 TIMER_DURATION_PATTERN = r"(?i)[0-9]+(?=\s+--v=2\s+--request-id=[0-9a-f]{32}\s+--receipt=[0-9a-f]{32}\.[0-9a-f]{64}\s+--action=timer\.start\s*$)"
 NAMESPACE = uuid.UUID("fae2f1d4-ae8e-55d4-bc9a-e4b0e6b1f5a8")
+PERMISSION_BOOTSTRAP_GROUP = "DBA7C2B0-2414-5D53-99CA-4D283D77DE51"
 
 
 def uid(branch: str, name: str) -> str:
@@ -82,6 +84,104 @@ def message_content_input() -> dict[str, object]:
         },
         "WFSerializationType": "WFTextTokenAttachment",
     }
+
+
+def normalized_text_input() -> dict[str, object]:
+    return {
+        "Type": "Variable",
+        "Variable": {
+            "Value": {
+                "OutputName": "Text",
+                "OutputUUID": NORMALIZED_COMMAND_UUID,
+                "Type": "ActionOutput",
+            },
+            "WFSerializationType": "WFTextTokenAttachment",
+        },
+    }
+
+
+def ensure_permission_bootstrap(actions: list[dict[str, object]]) -> bool:
+    """Add a no-input, local-only branch that surfaces iOS privacy prompts."""
+    if any(
+        item.get("WFWorkflowActionParameters", {}).get("GroupingIdentifier")
+        == PERMISSION_BOOTSTRAP_GROUP
+        for item in actions
+    ):
+        return False
+
+    def clone_action(identifier: str, name: str, *, after: int = 0) -> dict[str, object]:
+        for item in actions[after:]:
+            if item.get("WFWorkflowActionIdentifier") != identifier:
+                continue
+            clone = deepcopy(item)
+            parameters = clone.setdefault("WFWorkflowActionParameters", {})
+            parameters["UUID"] = uid("permission-bootstrap", name)
+            parameters.pop("CustomOutputName", None)
+            return clone
+        raise RuntimeError(f"missing permission bootstrap source action {identifier}")
+
+    alarm_branch = next(
+        index
+        for index, item in enumerate(actions)
+        if item.get("WFWorkflowActionParameters", {}).get("WFConditionalActionString")
+        == f"{COMMAND_SECRET} hola alarm get"
+    )
+    bootstrap = [
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+            "WFWorkflowActionParameters": {
+                "GroupingIdentifier": PERMISSION_BOOTSTRAP_GROUP,
+                "WFCondition": 100,
+                "WFControlFlowMode": 0,
+                "WFInput": normalized_text_input(),
+            },
+        },
+        # Mode 1 is Otherwise: authenticated Message input stays above; a
+        # manual no-input run reaches only these read-only permission probes.
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+            "WFWorkflowActionParameters": {
+                "GroupingIdentifier": PERMISSION_BOOTSTRAP_GROUP,
+                "WFControlFlowMode": 1,
+            },
+        },
+        clone_action("is.workflow.actions.getclipboard", "clipboard"),
+        {"WFWorkflowActionIdentifier": "is.workflow.actions.nothing"},
+        clone_action("is.workflow.actions.getcurrentapp", "current-app"),
+        clone_action("is.workflow.actions.getonscreencontent", "on-screen-content"),
+        {"WFWorkflowActionIdentifier": "is.workflow.actions.nothing"},
+        clone_action("is.workflow.actions.takescreenshot", "screenshot"),
+        {"WFWorkflowActionIdentifier": "is.workflow.actions.nothing"},
+        clone_action(
+            "com.apple.mobiletimer-framework.MobileTimerIntents.MTGetAlarmsIntent",
+            "alarms",
+            after=alarm_branch,
+        ),
+        {"WFWorkflowActionIdentifier": "is.workflow.actions.nothing"},
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
+            "WFWorkflowActionParameters": {
+                "ShowHeaders": False,
+                "UUID": uid("permission-bootstrap", "receiver-health"),
+                "WFURL": f"{PUBLIC}/health",
+            },
+        },
+        {"WFWorkflowActionIdentifier": "is.workflow.actions.nothing"},
+        {
+            "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+            "WFWorkflowActionParameters": {
+                "GroupingIdentifier": PERMISSION_BOOTSTRAP_GROUP,
+                "UUID": uid("permission-bootstrap", "end"),
+                "WFControlFlowMode": 2,
+            },
+        },
+    ]
+    # The opening If wraps every authenticated command branch. Insert its
+    # Otherwise/bootstrap/end after those branches so manual runs cannot
+    # accidentally execute mutations.
+    actions.insert(1, bootstrap[0])
+    actions.extend(bootstrap[1:])
+    return True
 
 
 def harden_command_input(actions: list[dict[str, object]]) -> bool:
@@ -511,13 +611,15 @@ def main() -> int:
         item.get("WFWorkflowActionParameters", {}).get("WFURL") == f"{PUBLIC}/receipt"
         for item in actions
     )
-    if len(actions) in {211, 243, 244} and receipt_count == 16:
+    if len(actions) in {211, 243, 244, 258} and receipt_count == 16:
         changed = False
         if len(actions) == 211 and upgrade_existing_receipts(actions):
             changed = True
         if migrate_existing_receipt_contract(actions):
             changed = True
         if harden_command_input(actions):
+            changed = True
+        if ensure_permission_bootstrap(actions):
             changed = True
         for item in actions:
             parameters = item.get("WFWorkflowActionParameters", {})
@@ -621,6 +723,7 @@ def main() -> int:
         add_data_parser(actions, branch, suffix_path)
 
     harden_command_input(actions)
+    ensure_permission_bootstrap(actions)
 
     with TEMPLATE.open("wb") as output:
         plistlib.dump(actions, output, fmt=plistlib.FMT_XML, sort_keys=False)

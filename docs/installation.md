@@ -111,7 +111,7 @@ The first `iphone` command may prompt you to let the sender's Python process con
 ./scripts/copy-shortcut
 ```
 
-This command reads the private hostname and token, renders `build/ios-assistant-actions.plist` with mode `0600`, and writes 244 Shortcuts action items to the Mac pasteboard. The generated Shortcut includes the version-2 receipt branches; it is not interchangeable with an older 95-action export.
+This command reads the private hostname and token, renders `build/ios-assistant-actions.plist` with mode `0600`, and writes 258 Shortcuts action items to the Mac pasteboard. The generated Shortcut includes the version-2 receipt branches and the local-only permission bootstrap; it is not interchangeable with an older export.
 
 In Shortcuts on the Mac:
 
@@ -119,7 +119,7 @@ In Shortcuts on the Mac:
 2. Name it `iOS Assistant`.
 3. Click the empty action canvas.
 4. Press Command-V once.
-5. Wait for all 244 actions to appear, then close the editor.
+5. Wait for all 258 actions to appear, then close the editor.
 
 Do not copy plist text into Shortcuts. The Swift helper has placed native `com.apple.shortcuts.action` items on the pasteboard.
 
@@ -149,7 +149,12 @@ without the private-prefix branch conditions.
 
 ## 7. Grant iPhone permissions
 
-Run the Shortcut by hand once. iOS may ask for access to the receiver hostname, on-screen content, screenshots, alarms, or the clipboard as it reaches each branch. Choose Allow for features you plan to use.
+Run the Shortcut by hand once with no input. Its dedicated setup branch reads
+the clipboard, on-screen content, a screenshot, and alarms locally, discards
+each result, and makes a body-free request to the receiver health endpoint.
+iOS may ask for access to those features or the receiver hostname; choose
+Allow. The setup branch cannot mutate the phone or upload the private results.
+iOS may retain the read-action outputs in local Shortcut run history.
 
 The installed Shortcut contains the receiver token and private command secret. Keep the Shortcut and `build/ios-assistant-actions.plist` private.
 

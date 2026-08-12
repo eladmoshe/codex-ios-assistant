@@ -111,8 +111,8 @@ If `contacts` is missing, install Xcode Command Line Tools, accept the Xcode lic
 - Click the canvas before pressing Command-V.
 - Press Command-V once.
 - Rerun `scripts/copy-shortcut` if the pasteboard contains something else.
-- Check for `Copied and verified 244 Shortcuts actions` in the terminal.
+- Check for `Copied and verified 258 Shortcuts actions` in the terminal.
 - Run `make test` to validate the committed plist.
 
 Do not create a new versioned Shortcut or repoint the automation; save the
-existing Shortcut only after all 244 actions appear and validation passes.
+existing Shortcut only after all 258 actions appear and validation passes.

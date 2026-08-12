@@ -68,6 +68,16 @@ the automation. The rendered Shortcut contains the secret and must remain
 private. Receipt capabilities authenticate the result after execution; they do
 not replace this command gate.
 
+Manual no-input execution enters a dedicated permission-bootstrap branch. It
+invokes only read-only iOS actions for clipboard, current/on-screen content,
+screenshot, and alarms, immediately discards each result locally, and makes a
+body-free request to the public `/health` endpoint. The bootstrap has no
+mutation actions, receipt capabilities, authenticated data endpoints, or
+private-data uploads. Authenticated Message input takes the command branch and
+cannot fall through into the bootstrap. The read actions are private even when
+their outputs are discarded from the network path; iOS may retain action
+outputs in local Shortcut run history according to its own retention behavior.
+
 Restrict the iPhone Message automation to the expected sender when self-message
 matching works reliably. `Any Sender` is supported only with the current
 secret-gated Shortcut and a private self-iMessage target; the `hola` content

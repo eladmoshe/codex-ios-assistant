@@ -7,7 +7,7 @@ The Mac sends commands through iMessage. The iPhone returns data through HTTPS.
 1. The `iphone` CLI validates arguments and builds either an Apple URL or a Shortcut command.
 2. The `iphone-control` skill tells Codex which CLI command to use and how to interpret its result.
 3. A per-user LaunchAgent accepts commands on a Unix socket and automates Messages in the macOS GUI session.
-4. A Message automation on the iPhone runs the 244-action Shortcut for messages that match `hola`; every native branch additionally requires the private command prefix.
+4. A Message automation on the iPhone runs the 258-action Shortcut for messages that match `hola`; every native command branch additionally requires the private command prefix. A separate manual no-input branch only surfaces privacy prompts, discards protected results locally, and performs a body-free receiver health check.
 5. The Shortcut runs an iOS action. Mutating branches post a versioned receipt to `/receipt`; branches that produce data post a bounded response to `/text`, `/photo`, `/clipboard`, or `/get-alarm` with the same receipt capability.
 6. A named Cloudflare Tunnel sends requests for the public hostname to the receiver on `127.0.0.1:8787`.
 7. The CLI polls the local receiver for text data or watches the private inbox for a screenshot until it gets a response or reaches the timeout.
