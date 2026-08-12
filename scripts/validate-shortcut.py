@@ -133,12 +133,26 @@ def main() -> int:
     bootstrap_open = actions[1].get("WFWorkflowActionParameters", {})
     bootstrap_else = actions[245].get("WFWorkflowActionParameters", {})
     bootstrap_close = actions[257].get("WFWorkflowActionParameters", {})
+    if any(
+        actions[index].get("WFWorkflowActionIdentifier") != "is.workflow.actions.conditional"
+        for index in (1, 245, 257)
+    ):
+        raise SystemExit("permission bootstrap markers must remain conditional actions")
     if (
         bootstrap_open.get("WFControlFlowMode") != 0
         or bootstrap_else.get("WFControlFlowMode") != 1
         or bootstrap_close.get("WFControlFlowMode") != 2
     ):
         raise SystemExit("permission bootstrap control-flow modes must be If, Otherwise, End If")
+    if bootstrap_else != {
+        "GroupingIdentifier": PERMISSION_BOOTSTRAP_GROUP,
+        "WFControlFlowMode": 1,
+    } or bootstrap_close != {
+        "GroupingIdentifier": PERMISSION_BOOTSTRAP_GROUP,
+        "UUID": "6A4BC2B2-9F13-5CBC-843D-2318A9F2FA38",
+        "WFControlFlowMode": 2,
+    }:
+        raise SystemExit("permission bootstrap Otherwise and End If markers changed")
     if bootstrap_open.get("WFCondition") != 100 or bootstrap_open.get("WFInput") != {
         "Type": "Variable",
         "Variable": {

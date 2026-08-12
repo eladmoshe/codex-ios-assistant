@@ -205,6 +205,22 @@ class ShortcutValidatorTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("control-flow modes", result.stderr)
 
+    def test_rejects_permission_bootstrap_nonconditional_marker(self):
+        with TEMPLATE.open("rb") as source:
+            actions = plistlib.load(source)
+        actions[245]["WFWorkflowActionIdentifier"] = "is.workflow.actions.setclipboard"
+        with tempfile.NamedTemporaryFile(suffix=".plist") as mutated:
+            plistlib.dump(actions, mutated)
+            mutated.flush()
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), mutated.name],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("markers must remain conditional", result.stderr)
+
     def test_rejects_permission_bootstrap_alarm_scope_expansion(self):
         with TEMPLATE.open("rb") as source:
             actions = plistlib.load(source)
